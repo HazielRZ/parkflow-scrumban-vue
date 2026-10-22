@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useRoute } from 'vue-router'
 import {
   AlertCircle,
   AlertTriangle,
@@ -11,14 +12,15 @@ import TaskDetailModal from '@/components/TaskDetailModal.vue'
 import { useScrumbanStore } from '@/stores/useScrumbanStore'
 
 const scrumbanStore = useScrumbanStore()
+const route = useRoute()
 </script>
 
 <template>
   <div class="min-h-screen flex flex-col bg-slate-950 text-slate-100">
-    <!-- Barra Superior de Sprint, RBAC y Navegación -->
-    <NavbarSprintHeader />
+    <!-- Barra Superior de Sprint, RBAC y Navegación (oculta en /login) -->
+    <NavbarSprintHeader v-if="!route.meta.hideNavbar" />
 
-    <!-- Contenido Principal (Tablero Scrumban o Matriz ERSIS2026 III) -->
+    <!-- Contenido Principal (/login, Tablero Scrumban o Matriz ERSIS2026 III) -->
     <main class="flex-1">
       <router-view />
     </main>
@@ -72,8 +74,11 @@ const scrumbanStore = useScrumbanStore()
       </div>
     </div>
 
-    <!-- Pie de página institucional -->
-    <footer class="border-t border-slate-900 bg-slate-950/90 py-3 px-4 text-center text-[11px] text-slate-500">
+    <!-- Pie de página institucional (oculto en /login porque tiene el suyo propio) -->
+    <footer
+      v-if="!route.meta.hideNavbar"
+      class="border-t border-slate-900 bg-slate-950/90 py-3 px-4 text-center text-[11px] text-slate-500"
+    >
       <div class="mx-auto max-w-[1600px] flex flex-wrap items-center justify-between gap-2">
         <span>
           <strong>PARK FLOW</strong> — Instituto Tecnológico de Morelia (Ingeniería en Sistemas Computacionales • Plan ISIC-2010-224)

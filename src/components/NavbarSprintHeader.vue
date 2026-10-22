@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   UserCheck,
   LogIn,
+  LogOut,
   Play
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/useAuthStore'
@@ -120,6 +121,18 @@ const openCompleteSprintModal = () => {
 
 const confirmCompleteSprint = () => {
   scrumbanStore.completeSprint(targetSprintForCompletion.value.id)
+}
+
+const handleLogout = () => {
+  isRoleDropdownOpen.value = false
+  authStore.logout()
+  scrumbanStore.pushToast(
+    'info',
+    'Sesión Cerrada',
+    'Has salido a la pantalla de inicio de sesión institucional (@morelia.tecnm.mx).',
+    2800
+  )
+  router.push('/login')
 }
 </script>
 
@@ -350,13 +363,23 @@ const confirmCompleteSprint = () => {
                   Control de Acceso RBAC (RNF-02)
                 </span>
               </div>
-              <button
-                type="button"
-                @click="isRoleDropdownOpen = false"
-                class="text-xs text-slate-400 hover:text-white"
-              >
-                Cerrar
-              </button>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  @click="handleLogout"
+                  class="flex items-center gap-1 rounded-md bg-rose-500/15 px-2 py-1 text-[11px] font-semibold text-rose-300 hover:bg-rose-500/25 transition"
+                >
+                  <LogOut class="h-3 w-3" />
+                  Cerrar sesión
+                </button>
+                <button
+                  type="button"
+                  @click="isRoleDropdownOpen = false"
+                  class="text-xs text-slate-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             <!-- Input de correo institucional o No. Control -->
@@ -436,6 +459,16 @@ const confirmCompleteSprint = () => {
           title="Restaurar datos semilla oficiales de PARK FLOW (PF-5 a PF-24)"
         >
           <RotateCcw class="h-4 w-4" />
+        </button>
+
+        <!-- Botón directo Cerrar Sesión -->
+        <button
+          type="button"
+          @click="handleLogout"
+          class="rounded-lg border border-slate-800 bg-slate-900 p-2 text-rose-400 hover:border-rose-500/50 hover:bg-rose-950/40 transition"
+          title="Cerrar sesión e ir a pantalla de Login (/login)"
+        >
+          <LogOut class="h-4 w-4" />
         </button>
       </div>
     </div>

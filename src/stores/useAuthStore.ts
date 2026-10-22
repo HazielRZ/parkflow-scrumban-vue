@@ -3,25 +3,35 @@ import { defineStore } from 'pinia'
 import { TEAM_MEMBERS_SEED } from '@/data/parkflowSeed'
 import type { Role, TeamMember } from '@/types/scrumban'
 
-const STORAGE_AUTH_KEY = 'parkflow_scrumban_current_user_v1'
+const STORAGE_AUTH_USER_KEY = 'parkflow_scrumban_current_user_v1'
+const STORAGE_AUTH_SESSION_KEY = 'parkflow_scrumban_authenticated_v1'
 
 export const useAuthStore = defineStore('auth', () => {
   const members = ref<TeamMember[]>(TEAM_MEMBERS_SEED)
 
   const loadInitialUser = (): TeamMember => {
     try {
-      const savedId = localStorage.getItem(STORAGE_AUTH_KEY)
+      const savedId = localStorage.getItem(STORAGE_AUTH_USER_KEY)
       if (savedId) {
         const found = TEAM_MEMBERS_SEED.find((m) => m.id === savedId)
         if (found) return found
       }
     } catch {
-      // Fallback to Haziel (ADMIN_PO_SM)
+      // fallback
     }
     return TEAM_MEMBERS_SEED[0]
   }
 
+  const loadInitialSession = (): boolean => {
+    try {
+      return localStorage.getItem(STORAGE_AUTH_SESSION_KEY) === 'true'
+    } catch {
+      return false
+    }
+  }
+
   const currentUser = ref<TeamMember>(loadInitialUser())
+  const isAuthenticated = ref<boolean>(loadInitialSession())
   const isLoginModalOpen = ref(false)
   const authError = ref<string | null>(null)
 
@@ -42,9 +52,10 @@ export const useAuthStore = defineStore('auth', () => {
     ['ADMIN_PO_SM', 'TECH_LEAD'].includes(currentUser.value.rbacRole)
   )
 
-  const saveUserToStorage = (memberId: string) => {
+  const persistSession = (memberId: string, authenticated: boolean) => {
     try {
-      localStorage.setItem(STORAGE_AUTH_KEY, memberId)
+      localStorage.setItem(STORAGE_AUTH_USER_KEY, memberId)
+      localStorage.setItem(STORAGE_AUTH_SESSION_KEY, authenticated ? 'true' : 'false')
     } catch {
       // ignore storage errors
     }
@@ -54,20 +65,25 @@ export const useAuthStore = defineStore('auth', () => {
     const found = members.value.find((m) => m.id === memberId)
     if (!found) return false
     currentUser.value = found
+    isAuthenticated.value = true
     authError.value = null
-    saveUserToStorage(found.id)
+    persistSession(found.id, true)
     return true
   }
 
   /**
-   * Autenticación institucional @morelia.tecnm.mx o por número de control.
+   * Autenticación institucional @morelia.tecnm.mx o por número de control (RNF-02).
    * Acepta para Luis Antonio Anzaldua Mendez tanto l24121432@morelia.tecnm.mx,
    * l24120432@morelia.tecnm.mx como su número de control 24120432.
+   * Valida contraseña / No. de control si se provee.
    */
-  const loginWithInstitutionalInput = (rawInput: string): { ok: boolean; message: string } => {
+  const loginWithInstitutionalInput = (
+    rawInput: string,
+    passwordInput?: string
+  ): { ok: boolean; message: string } => {
     const normalized = rawInput.trim().toLowerCase()
     if (!normalized) {
-      authError.value = 'Ingresa un correo institucional @morelia.tecnm.mx o número de control.'
+      authError.value = 'Ingresa tu correo institucional @morelia.tecnm.mx o número de control.'
       return { ok: false, message: authError.value }
     }
 
@@ -79,9 +95,18 @@ export const useAuthStore = defineStore('auth', () => {
     })
 
     if (matched) {
+      // Si se ingresó contraseña en la pantalla de login, aceptamos su No. de control,
+      // "parkflow2026", "tecnm2026" o cualquier clave institucional válida (>= 4 caracteres)
+      if (passwordInput !== undefined && passwordInput.trim().length > 0 && passwordInput.trim().length < 4) {
+        authError.value =
+          'La clave de acceso o número de control debe tener al menos 4 caracteres.'
+        return { ok: false, message: authError.value }
+      }
+
       currentUser.value = matched
+      isAuthenticated.value = true
       authError.value = null
-      saveUserToStorage(matched.id)
+      persistSession(matched.id, true)
       isLoginModalOpen.value = false
       return {
         ok: true,
@@ -96,8 +121,9 @@ export const useAuthStore = defineStore('auth', () => {
         ...guestProfile,
         email: normalized
       }
+      isAuthenticated.value = true
       authError.value = null
-      saveUserToStorage(guestProfile.id)
+      persistSession(guestProfile.id, true)
       isLoginModalOpen.value = false
       return {
         ok: true,
@@ -114,10 +140,21 @@ export const useAuthStore = defineStore('auth', () => {
     const guest = members.value.find((m) => m.rbacRole === 'GUEST_VIEWER')
     if (guest) {
       currentUser.value = guest
+      isAuthenticated.value = true
       authError.value = null
-      saveUserToStorage(guest.id)
+      persistSession(guest.id, true)
     }
     isLoginModalOpen.value = false
+  }
+
+  const logout = () => {
+    isAuthenticated.value = false
+    authError.value = null
+    try {
+      localStorage.setItem(STORAGE_AUTH_SESSION_KEY, 'false')
+    } catch {
+      // ignore
+    }
   }
 
   const getMemberById = (memberId?: string): TeamMember | undefined => {
@@ -143,6 +180,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     members,
     currentUser,
+    isAuthenticated,
     currentRole,
     isReadOnly,
     isAdminPoSm,
@@ -154,6 +192,7 @@ export const useAuthStore = defineStore('auth', () => {
     switchUserById,
     loginWithInstitutionalInput,
     enterGuestEvaluatorMode,
+    logout,
     getMemberById,
     roleBadgeLabel
   }
