@@ -11,7 +11,10 @@ import {
   Send,
   Layers,
   CheckCircle2,
-  Lock
+  Lock,
+  Pencil,
+  Trash2,
+  Plus
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useScrumbanStore } from '@/stores/useScrumbanStore'
@@ -37,10 +40,13 @@ const coAssignee = computed(() =>
 const branchInput = ref('')
 const prInput = ref('')
 const commentInput = ref('')
+const newSubtaskInput = ref('')
+const confirmDelete = ref(false)
 
 watch(
   task,
   (newTask) => {
+    confirmDelete.value = false
     if (newTask) {
       branchInput.value = newTask.githubBranch
       prInput.value = newTask.pullRequestUrl || ''
@@ -51,6 +57,7 @@ watch(
 
 const closeModal = () => {
   scrumbanStore.activeTaskModalKey = null
+  confirmDelete.value = false
 }
 
 const handleColumnChange = (colId: ColumnId) => {
@@ -71,12 +78,32 @@ const handleSaveGit = () => {
   scrumbanStore.updateTaskGitInfo(task.value.key, branchInput.value, prInput.value)
 }
 
+const handleAddSubtask = () => {
+  if (!task.value || !newSubtaskInput.value.trim()) return
+  const ok = scrumbanStore.addSubtask(task.value.key, newSubtaskInput.value)
+  if (ok) {
+    newSubtaskInput.value = ''
+  }
+}
+
 const handleSendComment = () => {
   if (!task.value || !commentInput.value.trim()) return
   const ok = scrumbanStore.addComment(task.value.key, commentInput.value)
   if (ok) {
     commentInput.value = ''
   }
+}
+
+const handleEditTask = () => {
+  if (!task.value) return
+  const key = task.value.key
+  closeModal()
+  scrumbanStore.openEditTaskModal(key)
+}
+
+const handleDeleteTask = () => {
+  if (!task.value) return
+  scrumbanStore.deleteTask(task.value.key)
 }
 </script>
 
@@ -89,7 +116,7 @@ const handleSendComment = () => {
     <div
       class="relative my-8 w-full max-w-3xl rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden"
     >
-      <!-- Encabezado del Modal -->
+      <!-- Encabezado del Modal con Acciones CRUD (Editar / Eliminar) -->
       <div class="flex items-start justify-between gap-4 border-b border-slate-800 bg-slate-950/70 px-6 py-4">
         <div>
           <div class="flex flex-wrap items-center gap-2 mb-1.5">
@@ -119,13 +146,46 @@ const handleSendComment = () => {
           </h2>
         </div>
 
-        <button
-          type="button"
-          @click="closeModal"
-          class="rounded-lg border border-slate-700 bg-slate-800 p-1.5 text-slate-400 hover:text-white"
-        >
-          <X class="h-5 w-5" />
-        </button>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <!-- Botones CRUD para ADMIN_PO_SM y TECH_LEAD -->
+          <button
+            v-if="authStore.canCreateOrEditTasks"
+            type="button"
+            @click="handleEditTask"
+            class="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-slate-700 transition"
+            title="Editar historia, responsable o códigos ERS"
+          >
+            <Pencil class="h-3.5 w-3.5" />
+            <span>Editar</span>
+          </button>
+
+          <button
+            v-if="authStore.canCreateOrEditTasks && !confirmDelete"
+            type="button"
+            @click="confirmDelete = true"
+            class="rounded-lg border border-slate-700 bg-slate-800 p-1.5 text-rose-400 hover:bg-rose-950/50 transition"
+            title="Eliminar tarea"
+          >
+            <Trash2 class="h-4 w-4" />
+          </button>
+
+          <button
+            v-if="confirmDelete"
+            type="button"
+            @click="handleDeleteTask"
+            class="rounded-lg bg-rose-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-rose-500"
+          >
+            Confirmar Eliminar
+          </button>
+
+          <button
+            type="button"
+            @click="closeModal"
+            class="rounded-lg border border-slate-700 bg-slate-800 p-1.5 text-slate-400 hover:text-white"
+          >
+            <X class="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       <!-- Cuerpo del Modal -->
@@ -294,38 +354,74 @@ const handleSendComment = () => {
           </div>
         </div>
 
-        <!-- Subtareas Interactivas y Vínculo con GitHub -->
+        <!-- Subtareas Interactivas (CRUD) y Vínculo con GitHub -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Subtareas -->
-          <div class="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3">
-              Subtareas Técnicas ({{ task.subtasks.filter((s) => s.completed).length }}/{{
-                task.subtasks.length
-              }})
-            </h3>
-            <div class="space-y-2">
-              <button
-                v-for="sub in task.subtasks"
-                :key="sub.id"
-                type="button"
-                :disabled="authStore.isReadOnly"
-                @click="scrumbanStore.toggleSubtask(task.key, sub.id)"
-                class="flex w-full items-center gap-2.5 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-left text-xs transition hover:border-slate-700 disabled:cursor-not-allowed"
-              >
-                <CheckSquare
-                  v-if="sub.completed"
-                  class="h-4 w-4 text-emerald-400 shrink-0"
-                />
-                <Square v-else class="h-4 w-4 text-slate-500 shrink-0" />
-                <span
-                  :class="
-                    sub.completed ? 'line-through text-slate-500' : 'text-slate-200'
-                  "
+          <!-- Subtareas con creación y borrado -->
+          <div class="rounded-xl border border-slate-800 bg-slate-950/50 p-4 flex flex-col justify-between">
+            <div>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3">
+                Subtareas Técnicas ({{ task.subtasks.filter((s) => s.completed).length }}/{{
+                  task.subtasks.length
+                }})
+              </h3>
+              <div class="space-y-2 mb-3">
+                <div
+                  v-for="sub in task.subtasks"
+                  :key="sub.id"
+                  class="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs"
                 >
-                  {{ sub.title }}
-                </span>
-              </button>
+                  <button
+                    type="button"
+                    :disabled="authStore.isReadOnly"
+                    @click="scrumbanStore.toggleSubtask(task.key, sub.id)"
+                    class="flex flex-1 items-center gap-2.5 text-left disabled:cursor-not-allowed"
+                  >
+                    <CheckSquare
+                      v-if="sub.completed"
+                      class="h-4 w-4 text-emerald-400 shrink-0"
+                    />
+                    <Square v-else class="h-4 w-4 text-slate-500 shrink-0" />
+                    <span
+                      :class="
+                        sub.completed ? 'line-through text-slate-500' : 'text-slate-200'
+                      "
+                    >
+                      {{ sub.title }}
+                    </span>
+                  </button>
+                  <button
+                    v-if="!authStore.isReadOnly"
+                    type="button"
+                    @click="scrumbanStore.deleteSubtask(task.key, sub.id)"
+                    class="text-slate-500 hover:text-rose-400 transition"
+                    title="Eliminar subtarea"
+                  >
+                    <Trash2 class="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
             </div>
+
+            <!-- Formulario para añadir nueva subtarea -->
+            <form
+              v-if="!authStore.isReadOnly"
+              @submit.prevent="handleAddSubtask"
+              class="flex gap-1.5 pt-2 border-t border-slate-800"
+            >
+              <input
+                v-model="newSubtaskInput"
+                type="text"
+                placeholder="Nueva subtarea técnica..."
+                class="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+              />
+              <button
+                type="submit"
+                class="flex items-center gap-1 rounded-lg bg-slate-800 border border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-slate-700"
+              >
+                <Plus class="h-3.5 w-3.5" />
+                Añadir
+              </button>
+            </form>
           </div>
 
           <!-- Vínculo GitHub Branch & Pull Request -->

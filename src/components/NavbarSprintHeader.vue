@@ -11,12 +11,12 @@ import {
   Kanban,
   FileSpreadsheet,
   ChevronDown,
-  Sparkles,
   AlertTriangle,
-  UserCheck,
-  LogIn,
   LogOut,
-  Play
+  Play,
+  Plus,
+  Cloud,
+  RefreshCw
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useScrumbanStore } from '@/stores/useScrumbanStore'
@@ -26,8 +26,7 @@ const scrumbanStore = useScrumbanStore()
 const route = useRoute()
 const router = useRouter()
 
-const isRoleDropdownOpen = ref(false)
-const institutionalInput = ref('')
+const isProfileMenuOpen = ref(false)
 
 const targetSprintForCompletion = computed(() => {
   if (scrumbanStore.selectedSprintFilter !== 'ALL') {
@@ -60,44 +59,9 @@ const sprintCompletionSummary = computed(() => {
   }
 })
 
-const handleSelectMember = (memberId: string) => {
-  const member = authStore.getMemberById(memberId)
-  authStore.switchUserById(memberId)
-  isRoleDropdownOpen.value = false
-  if (member) {
-    if (member.rbacRole === 'GUEST_VIEWER' && route.path !== '/guest') {
-      router.push('/guest')
-    } else if (member.rbacRole !== 'GUEST_VIEWER' && route.path === '/guest') {
-      router.push('/')
-    }
-    scrumbanStore.pushToast(
-      'info',
-      `Rol Activo: ${member.name}`,
-      `${member.email} — ${authStore.roleBadgeLabel(member.rbacRole)}`,
-      3000
-    )
-  }
-}
-
-const handleQuickLoginSubmit = () => {
-  const res = authStore.loginWithInstitutionalInput(institutionalInput.value)
-  if (res.ok) {
-    institutionalInput.value = ''
-    isRoleDropdownOpen.value = false
-    if (authStore.isReadOnly && route.path !== '/guest') {
-      router.push('/guest')
-    } else if (!authStore.isReadOnly && route.path === '/guest') {
-      router.push('/')
-    }
-    scrumbanStore.pushToast('success', 'Autenticación Institucional TecNM', res.message)
-  } else {
-    scrumbanStore.pushToast('error', 'Error de Autenticación (RNF-02)', res.message)
-  }
-}
-
 const activateGuestRoute = () => {
   authStore.enterGuestEvaluatorMode()
-  isRoleDropdownOpen.value = false
+  isProfileMenuOpen.value = false
   router.push('/guest')
   scrumbanStore.pushToast(
     'info',
@@ -124,12 +88,12 @@ const confirmCompleteSprint = () => {
 }
 
 const handleLogout = () => {
-  isRoleDropdownOpen.value = false
+  isProfileMenuOpen.value = false
   authStore.logout()
   scrumbanStore.pushToast(
     'info',
     'Sesión Cerrada',
-    'Has salido a la pantalla de inicio de sesión institucional (@morelia.tecnm.mx).',
+    'Ingresa tus credenciales institucionales (@morelia.tecnm.mx) para iniciar sesión.',
     2800
   )
   router.push('/login')
@@ -152,10 +116,10 @@ const handleLogout = () => {
       </div>
       <button
         type="button"
-        @click="handleSelectMember('member-haziel')"
+        @click="handleLogout"
         class="rounded bg-rose-800/80 px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-rose-700 transition"
       >
-        Cambiar a Haziel (PO/SM)
+        Iniciar Sesión como Integrante (@morelia.tecnm.mx)
       </button>
     </div>
 
@@ -175,13 +139,36 @@ const handleLogout = () => {
             <span
               class="rounded-md bg-emerald-500/15 px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-300 border border-emerald-500/30"
             >
-              Scrumban Engine v1.0
+              Scrumban Cloud
             </span>
-            <span
-              class="hidden sm:inline-flex items-center gap-1 rounded-md bg-slate-800 px-2 py-0.5 text-[11px] text-slate-300"
+            <!-- Indicador de estado de Netlify Blobs Cloud -->
+            <button
+              type="button"
+              @click="scrumbanStore.syncFromCloud(false)"
+              class="hidden sm:inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-mono transition"
+              :class="
+                scrumbanStore.cloudSyncStatus === 'synced'
+                  ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20'
+                  : scrumbanStore.cloudSyncStatus === 'syncing'
+                    ? 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+                    : 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700'
+              "
+              title="Haz clic para sincronizar ahora con Netlify Blobs Cloud"
             >
-              TecNM Morelia • ERSIS2026 III
-            </span>
+              <RefreshCw
+                class="h-3 w-3"
+                :class="scrumbanStore.cloudSyncStatus === 'syncing' ? 'animate-spin' : ''"
+              />
+              <span>
+                {{
+                  scrumbanStore.cloudSyncStatus === 'synced'
+                    ? 'Netlify Cloud Sync'
+                    : scrumbanStore.cloudSyncStatus === 'syncing'
+                      ? 'Sincronizando...'
+                      : 'Sync Local / Cloud'
+                }}
+              </span>
+            </button>
           </div>
           <p class="text-xs text-slate-400">
             Monitoreo de Estacionamiento por Visión Computacional (`OT-01` Sin Captura Facial)
@@ -189,7 +176,7 @@ const handleLogout = () => {
         </div>
       </div>
 
-      <!-- Navegación Central: Tablero vs Matriz ERS + Selector de Sprint -->
+      <!-- Navegación Central: Tablero vs Matriz ERS + Selector de Sprint + CRUD Nueva Tarea -->
       <div class="flex flex-wrap items-center gap-2">
         <div class="flex rounded-lg bg-slate-900 p-1 border border-slate-800">
           <router-link
@@ -242,10 +229,22 @@ const handleLogout = () => {
               }})
             </option>
             <option value="ALL" class="bg-slate-900 text-slate-100">
-              Todos los Sprints (PF-10 a PF-24)
+              Todos los Sprints ({{ scrumbanStore.tasks.length }} tareas)
             </option>
           </select>
         </div>
+
+        <!-- Botón CRUD: + Nueva Tarea (Habilitado para ADMIN_PO_SM y TECH_LEAD) -->
+        <button
+          v-if="authStore.canCreateOrEditTasks"
+          type="button"
+          @click="scrumbanStore.openCreateTaskModal"
+          class="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-500 transition shadow-sm"
+          title="Crear nueva historia o tarea técnica en el Backlog / Sprint"
+        >
+          <Plus class="h-3.5 w-3.5" />
+          <span>Nueva Tarea ({{ scrumbanStore.getNextTaskKey() }})</span>
+        </button>
 
         <!-- Botón Iniciar Sprint si el sprint seleccionado está PLANNED y el usuario es Haziel -->
         <button
@@ -298,25 +297,12 @@ const handleLogout = () => {
         </label>
       </div>
 
-      <!-- Controles Derechos: Acceso Rápido /guest, Selector de Usuario RBAC (@morelia.tecnm.mx) y Reset -->
+      <!-- Controles Derechos: Perfil Autenticado y Cerrar Sesión -->
       <div class="flex items-center gap-2">
-        <!-- Botón directo Modo Evaluador / Invitado (/guest) -->
-        <button
-          v-if="!authStore.isReadOnly"
-          type="button"
-          @click="activateGuestRoute"
-          class="hidden xl:flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 py-1.5 text-xs font-medium text-rose-200 hover:bg-rose-500/20 transition"
-          title="Activar vista de Evaluador / Invitado (Solo lectura estricta) en menos de 1 segundo"
-        >
-          <Eye class="h-3.5 w-3.5 text-rose-400" />
-          Vista Evaluador (/guest)
-        </button>
-
-        <!-- Selector de Rol / Usuario Institucional (@morelia.tecnm.mx) -->
         <div class="relative">
           <button
             type="button"
-            @click="isRoleDropdownOpen = !isRoleDropdownOpen"
+            @click="isProfileMenuOpen = !isProfileMenuOpen"
             class="flex items-center gap-2.5 rounded-xl border border-slate-700/80 bg-slate-900 px-3 py-1.5 text-left hover:border-emerald-500/50 transition"
           >
             <div
@@ -351,115 +337,70 @@ const handleLogout = () => {
             <ChevronDown class="h-4 w-4 text-slate-400" />
           </button>
 
-          <!-- Dropdown RBAC & Login Institucional @morelia.tecnm.mx -->
+          <!-- Menú de Sesión Activa (Protegido con Contraseña para cambiar de cuenta) -->
           <div
-            v-if="isRoleDropdownOpen"
-            class="absolute right-0 mt-2 w-96 rounded-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl z-50"
+            v-if="isProfileMenuOpen"
+            class="absolute right-0 mt-2 w-80 rounded-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl z-50 space-y-3"
           >
-            <div class="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-3">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
               <div class="flex items-center gap-2">
                 <ShieldCheck class="h-4 w-4 text-emerald-400" />
                 <span class="text-xs font-bold uppercase tracking-wider text-slate-200">
-                  Control de Acceso RBAC (RNF-02)
+                  Sesión Institucional Activa
                 </span>
               </div>
-              <div class="flex items-center gap-2">
-                <button
-                  type="button"
-                  @click="handleLogout"
-                  class="flex items-center gap-1 rounded-md bg-rose-500/15 px-2 py-1 text-[11px] font-semibold text-rose-300 hover:bg-rose-500/25 transition"
-                >
-                  <LogOut class="h-3 w-3" />
-                  Cerrar sesión
-                </button>
-                <button
-                  type="button"
-                  @click="isRoleDropdownOpen = false"
-                  class="text-xs text-slate-400 hover:text-white"
-                >
-                  ✕
-                </button>
-              </div>
+              <button
+                type="button"
+                @click="isProfileMenuOpen = false"
+                class="text-xs text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
             </div>
 
-            <!-- Input de correo institucional o No. Control -->
-            <form @submit.prevent="handleQuickLoginSubmit" class="mb-3">
-              <label class="block text-[11px] font-medium text-slate-400 mb-1">
-                Ingresar con correo <code class="text-emerald-300">@morelia.tecnm.mx</code> o No. Control:
-              </label>
-              <div class="flex gap-1.5">
-                <input
-                  v-model="institutionalInput"
-                  type="text"
-                  placeholder="Ej. l221213339@morelia.tecnm.mx o 24120432"
-                  class="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  class="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
-                >
-                  <LogIn class="h-3.5 w-3.5" />
-                  Entrar
-                </button>
-              </div>
-            </form>
+            <div class="rounded-xl border border-slate-800 bg-slate-950 p-3 space-y-1.5">
+              <p class="text-xs font-bold text-white">{{ authStore.currentUser.name }}</p>
+              <p class="font-mono text-[11px] text-emerald-400">{{ authStore.currentUser.email }}</p>
+              <p class="text-[11px] text-cyan-300 font-semibold">
+                {{ authStore.currentUser.projectRole }} ({{ authStore.currentRole }})
+              </p>
+              <p class="text-[11px] text-slate-400 leading-relaxed pt-1 border-t border-slate-800">
+                {{ authStore.currentUser.permissionsSummary }}
+              </p>
+            </div>
 
-            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
-              Cambio rápido de perfil para demostración / evaluación:
-            </p>
-
-            <div class="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+            <div class="space-y-1.5 pt-1">
               <button
-                v-for="member in authStore.members"
-                :key="member.id"
+                v-if="!authStore.isReadOnly"
                 type="button"
-                @click="handleSelectMember(member.id)"
-                class="w-full flex items-start gap-2.5 rounded-xl p-2 text-left transition border"
-                :class="
-                  authStore.currentUser.id === member.id
-                    ? 'border-emerald-500/60 bg-emerald-500/10'
-                    : 'border-slate-800 bg-slate-950/60 hover:border-slate-700 hover:bg-slate-800/60'
-                "
+                @click="activateGuestRoute"
+                class="w-full flex items-center justify-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-200 hover:bg-rose-500/20 transition"
               >
-                <div
-                  class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
-                  :class="member.avatarColor"
-                >
-                  {{ member.avatarInitials }}
-                </div>
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center justify-between gap-1">
-                    <span class="truncate text-xs font-semibold text-white">
-                      {{ member.name }}
-                    </span>
-                    <span
-                      class="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-emerald-300"
-                    >
-                      {{ member.rbacRole }}
-                    </span>
-                  </div>
-                  <p class="font-mono text-[10px] text-slate-400">
-                    {{ member.email }} • {{ member.controlNumber }}
-                  </p>
-                  <p class="mt-0.5 text-[10px] text-slate-300 line-clamp-2">
-                    {{ member.permissionsSummary }}
-                  </p>
-                </div>
+                <Eye class="h-3.5 w-3.5 text-rose-400" />
+                Pasar a Vista Evaluador (/guest)
+              </button>
+
+              <button
+                v-if="authStore.isAdminPoSm"
+                type="button"
+                @click="scrumbanStore.resetToOfficialSeed(); isProfileMenuOpen = false"
+                class="w-full flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition"
+              >
+                <RotateCcw class="h-3.5 w-3.5" />
+                Restaurar Semilla Oficial (PF-5 a PF-24)
+              </button>
+
+              <button
+                type="button"
+                @click="handleLogout"
+                class="w-full flex items-center justify-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-xs font-bold text-white hover:bg-rose-500 transition"
+              >
+                <LogOut class="h-3.5 w-3.5" />
+                {{ authStore.isReadOnly ? 'Iniciar Sesión con Cuenta de Equipo' : 'Cerrar Sesión / Cambiar Usuario' }}
               </button>
             </div>
           </div>
         </div>
-
-        <!-- Botón de restaurar datos semilla -->
-        <button
-          v-if="!authStore.isReadOnly"
-          type="button"
-          @click="scrumbanStore.resetToOfficialSeed"
-          class="rounded-lg border border-slate-800 bg-slate-900 p-2 text-slate-400 hover:border-slate-700 hover:text-white transition"
-          title="Restaurar datos semilla oficiales de PARK FLOW (PF-5 a PF-24)"
-        >
-          <RotateCcw class="h-4 w-4" />
-        </button>
 
         <!-- Botón directo Cerrar Sesión -->
         <button

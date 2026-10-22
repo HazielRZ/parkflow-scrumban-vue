@@ -3,8 +3,17 @@ import { defineStore } from 'pinia'
 import { TEAM_MEMBERS_SEED } from '@/data/parkflowSeed'
 import type { Role, TeamMember } from '@/types/scrumban'
 
-const STORAGE_AUTH_USER_KEY = 'parkflow_scrumban_current_user_v1'
-const STORAGE_AUTH_SESSION_KEY = 'parkflow_scrumban_authenticated_v1'
+const STORAGE_AUTH_USER_KEY = 'parkflow_scrumban_current_user_v2'
+const STORAGE_AUTH_SESSION_KEY = 'parkflow_scrumban_authenticated_v2'
+
+// Mapa estricto de contraseñas válidas por integrante para fallback local y validación instantánea
+const LOCAL_PASSWORDS_MAP: Record<string, string[]> = {
+  'member-haziel': ['PF-Haziel#221213339', '221213339', 'Haziel2026!'],
+  'member-rodrigo': ['PF-Rodrigo#23121118', '23121118'],
+  'member-miguel': ['PF-Miguel#23121135', '23121135'],
+  'member-julio': ['PF-Julio#23121112', '23121112'],
+  'member-luis': ['PF-Luis#24120432', '24120432']
+}
 
 export const useAuthStore = defineStore('auth', () => {
   const members = ref<TeamMember[]>(TEAM_MEMBERS_SEED)
@@ -19,7 +28,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch {
       // fallback
     }
-    return TEAM_MEMBERS_SEED[0]
+    return TEAM_MEMBERS_SEED.find((m) => m.rbacRole === 'GUEST_VIEWER') || TEAM_MEMBERS_SEED[0]
   }
 
   const loadInitialSession = (): boolean => {
@@ -34,6 +43,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = ref<boolean>(loadInitialSession())
   const isLoginModalOpen = ref(false)
   const authError = ref<string | null>(null)
+  const isAuthenticating = ref(false)
 
   const currentRole = computed<Role>(() => currentUser.value.rbacRole)
   const isReadOnly = computed<boolean>(() => currentUser.value.rbacRole === 'GUEST_VIEWER')
@@ -47,7 +57,7 @@ export const useAuthStore = defineStore('auth', () => {
     ['ADMIN_PO_SM', 'TECH_LEAD', 'DEV_QA'].includes(currentUser.value.rbacRole)
   )
 
-  // Solo ADMIN_PO_SM o TECH_LEAD pueden crear nuevas tareas o editar prioridades del Backlog
+  // Solo ADMIN_PO_SM o TECH_LEAD pueden crear, editar o eliminar tareas del Backlog
   const canCreateOrEditTasks = computed<boolean>(() =>
     ['ADMIN_PO_SM', 'TECH_LEAD'].includes(currentUser.value.rbacRole)
   )
@@ -61,81 +71,102 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const switchUserById = (memberId: string): boolean => {
-    const found = members.value.find((m) => m.id === memberId)
-    if (!found) return false
-    currentUser.value = found
-    isAuthenticated.value = true
-    authError.value = null
-    persistSession(found.id, true)
-    return true
-  }
-
   /**
-   * Autenticación institucional @morelia.tecnm.mx o por número de control (RNF-02).
-   * Acepta para Luis Antonio Anzaldua Mendez tanto l24121432@morelia.tecnm.mx,
-   * l24120432@morelia.tecnm.mx como su número de control 24120432.
-   * Valida contraseña / No. de control si se provee.
+   * Autenticación estricta con contraseña por integrante (RNF-02).
+   * Intenta validar primero contra la Netlify Function (/api/scrumban) y usa el validador
+   * estricto local si se ejecuta con Vite dev server sin Netlify CLI.
    */
-  const loginWithInstitutionalInput = (
-    rawInput: string,
-    passwordInput?: string
-  ): { ok: boolean; message: string } => {
-    const normalized = rawInput.trim().toLowerCase()
-    if (!normalized) {
-      authError.value = 'Ingresa tu correo institucional @morelia.tecnm.mx o número de control.'
+  const loginWithCredentials = async (
+    rawIdentifier: string,
+    rawPassword: string
+  ): Promise<{ ok: boolean; message: string }> => {
+    const normalized = rawIdentifier.trim().toLowerCase()
+    const password = rawPassword.trim()
+
+    if (!normalized || !password) {
+      authError.value =
+        'Ingresa tu correo institucional @morelia.tecnm.mx (o No. de Control) y tu contraseña.'
       return { ok: false, message: authError.value }
     }
 
+    isAuthenticating.value = true
+    authError.value = null
+
+    try {
+      // Intentar validación en Netlify Function (/api/scrumban)
+      const res = await fetch('/api/scrumban', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'LOGIN',
+          identifier: normalized,
+          password
+        })
+      })
+
+      const contentType = res.headers.get('content-type') || ''
+      if (contentType.includes('application/json')) {
+        const data = await res.json()
+        if (!res.ok || !data.ok) {
+          authError.value = data.message || 'Credenciales inválidas.'
+          isAuthenticating.value = false
+          return { ok: false, message: authError.value! }
+        }
+
+        const matchedMember = members.value.find((m) => m.id === data.memberId)
+        if (matchedMember) {
+          currentUser.value = matchedMember
+          isAuthenticated.value = true
+          persistSession(matchedMember.id, true)
+          isAuthenticating.value = false
+          return {
+            ok: true,
+            message: `Sesión iniciada como ${matchedMember.name} (${matchedMember.rbacRole})`
+          }
+        }
+      }
+    } catch {
+      // Fallback en modo desarrollo local (vite dev) con validación estricta
+    }
+
+    // Validación estricta local (mismas reglas que la Netlify Function)
     const matched = members.value.find((m) => {
+      if (m.rbacRole === 'GUEST_VIEWER') return false
       if (m.email.toLowerCase() === normalized) return true
       if (m.controlNumber.toLowerCase() === normalized) return true
       if (m.alternateEmails?.some((alt) => alt.toLowerCase() === normalized)) return true
       return false
     })
 
-    if (matched) {
-      // Si se ingresó contraseña en la pantalla de login, aceptamos su No. de control,
-      // "parkflow2026", "tecnm2026" o cualquier clave institucional válida (>= 4 caracteres)
-      if (passwordInput !== undefined && passwordInput.trim().length > 0 && passwordInput.trim().length < 4) {
-        authError.value =
-          'La clave de acceso o número de control debe tener al menos 4 caracteres.'
-        return { ok: false, message: authError.value }
-      }
+    isAuthenticating.value = false
 
-      currentUser.value = matched
-      isAuthenticated.value = true
-      authError.value = null
-      persistSession(matched.id, true)
-      isLoginModalOpen.value = false
-      return {
-        ok: true,
-        message: `Sesión iniciada como ${matched.name} (${matched.rbacRole})`
-      }
+    if (!matched) {
+      authError.value =
+        'Acceso denegado (RNF-02): Correo o Número de Control no registrado en el equipo PARK FLOW. Si eres evaluador usa "Vista Evaluador / Invitado (/guest)".'
+      return { ok: false, message: authError.value }
     }
 
-    if (normalized.endsWith('@morelia.tecnm.mx')) {
-      // Cualquier otro correo @morelia.tecnm.mx entra como Evaluador/Invitado Read-Only
-      const guestProfile = members.value.find((m) => m.rbacRole === 'GUEST_VIEWER')!
-      currentUser.value = {
-        ...guestProfile,
-        email: normalized
-      }
-      isAuthenticated.value = true
-      authError.value = null
-      persistSession(guestProfile.id, true)
-      isLoginModalOpen.value = false
-      return {
-        ok: true,
-        message: `Acceso institucional de solo lectura concedido para ${normalized}`
-      }
+    const allowedPasswords = LOCAL_PASSWORDS_MAP[matched.id] || []
+    if (!allowedPasswords.includes(password)) {
+      authError.value =
+        'Contraseña incorrecta para esta cuenta institucional @morelia.tecnm.mx.'
+      return { ok: false, message: authError.value }
     }
 
-    authError.value =
-      'Acceso denegado (RNF-02): Se requiere correo institucional @morelia.tecnm.mx o número de control registrado del equipo PARK FLOW.'
-    return { ok: false, message: authError.value }
+    currentUser.value = matched
+    isAuthenticated.value = true
+    authError.value = null
+    persistSession(matched.id, true)
+    return {
+      ok: true,
+      message: `Sesión verificada: ${matched.name} (${matched.rbacRole})`
+    }
   }
 
+  /**
+   * Acceso directo sin contraseña únicamente para el modo Evaluador / Invitado (Read-Only)
+   * según Regla 5.3 de AGENTS.md (Prof. Alma Lilia Núñez González / Invitados).
+   */
   const enterGuestEvaluatorMode = () => {
     const guest = members.value.find((m) => m.rbacRole === 'GUEST_VIEWER')
     if (guest) {
@@ -181,6 +212,7 @@ export const useAuthStore = defineStore('auth', () => {
     members,
     currentUser,
     isAuthenticated,
+    isAuthenticating,
     currentRole,
     isReadOnly,
     isAdminPoSm,
@@ -189,8 +221,7 @@ export const useAuthStore = defineStore('auth', () => {
     canCreateOrEditTasks,
     isLoginModalOpen,
     authError,
-    switchUserById,
-    loginWithInstitutionalInput,
+    loginWithCredentials,
     enterGuestEvaluatorMode,
     logout,
     getMemberById,

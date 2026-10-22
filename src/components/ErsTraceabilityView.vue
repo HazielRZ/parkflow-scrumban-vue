@@ -359,7 +359,7 @@ const openTask = (taskKey: string) => {
         Matriz Oficial del Equipo PARK FLOW y Control de Acceso Basado en Roles (RBAC)
       </h3>
       <p class="text-xs text-slate-400 mb-4">
-        Haz clic en cualquier integrante para simular su sesión institucional `@morelia.tecnm.mx` y verificar las reglas RBAC en vivo.
+        Matriz oficial de permisos RBAC protegida con autenticación institucional `@morelia.tecnm.mx` y validación en Netlify Functions.
       </p>
 
       <div class="overflow-x-auto">
@@ -372,7 +372,7 @@ const openTask = (taskKey: string) => {
               <th class="py-2.5 px-3">Rol en Proyecto</th>
               <th class="py-2.5 px-3">Rol RBAC</th>
               <th class="py-2.5 px-3">Permisos en el Gestor Scrumban</th>
-              <th class="py-2.5 px-3">Acción</th>
+              <th class="py-2.5 px-3">Estado</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800/70">
@@ -389,18 +389,18 @@ const openTask = (taskKey: string) => {
               <td class="py-2.5 px-3 font-mono font-bold text-cyan-300">{{ m.rbacRole }}</td>
               <td class="py-2.5 px-3 text-slate-400 max-w-md">{{ m.permissionsSummary }}</td>
               <td class="py-2.5 px-3">
-                <button
-                  type="button"
-                  @click="authStore.switchUserById(m.id)"
-                  class="rounded-lg px-2.5 py-1 text-[11px] font-semibold transition"
-                  :class="
-                    authStore.currentUser.id === m.id
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                  "
+                <span
+                  v-if="authStore.currentUser.id === m.id"
+                  class="inline-block rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white"
                 >
-                  {{ authStore.currentUser.id === m.id ? 'Activo' : 'Probar Rol' }}
-                </button>
+                  Sesión Activa
+                </span>
+                <span
+                  v-else
+                  class="inline-block rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-400"
+                >
+                  Protegido
+                </span>
               </td>
             </tr>
           </tbody>

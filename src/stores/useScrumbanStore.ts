@@ -21,11 +21,29 @@ import type {
   ToastNotification
 } from '@/types/scrumban'
 
-const STORAGE_TASKS_KEY = 'parkflow_scrumban_tasks_v1'
-const STORAGE_SPRINTS_KEY = 'parkflow_scrumban_sprints_v1'
-const STORAGE_ACTIVE_SPRINT_KEY = 'parkflow_scrumban_active_sprint_v1'
-const STORAGE_AUDIT_KEY = 'parkflow_scrumban_audit_v1'
+const STORAGE_TASKS_KEY = 'parkflow_scrumban_tasks_v2'
+const STORAGE_SPRINTS_KEY = 'parkflow_scrumban_sprints_v2'
+const STORAGE_ACTIVE_SPRINT_KEY = 'parkflow_scrumban_active_sprint_v2'
+const STORAGE_AUDIT_KEY = 'parkflow_scrumban_audit_v2'
 const BROADCAST_CHANNEL_NAME = 'parkflow_scrumban_sync'
+
+export interface TaskUpsertPayload {
+  title: string
+  description: string
+  epicKey: string
+  ersCodes: string[]
+  useCases: string[]
+  assigneeId: string
+  coAssigneeId?: string
+  sprintId: SprintId
+  columnId: ColumnId
+  githubBranch: string
+  pullRequestUrl?: string
+  storyPoints: number
+  priority: 'Crítica' | 'Alta' | 'Media'
+  layer: ArchitecturalLayer
+  acceptanceCriteria: string[]
+}
 
 export const useScrumbanStore = defineStore('scrumban', () => {
   const authStore = useAuthStore()
@@ -38,7 +56,7 @@ export const useScrumbanStore = defineStore('scrumban', () => {
       const raw = localStorage.getItem(STORAGE_TASKS_KEY)
       if (raw) {
         const parsed = JSON.parse(raw) as Task[]
-        if (Array.isArray(parsed) && parsed.length >= 15) return parsed
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
       }
     } catch {
       // fallback to seed
@@ -122,6 +140,10 @@ export const useScrumbanStore = defineStore('scrumban', () => {
   const columns = ref<ColumnDefinition[]>(COLUMNS_CONFIG)
   const auditLog = ref<AuditLogEntry[]>(loadAuditLog())
 
+  // Estado de sincronización con Netlify Blobs Cloud
+  const cloudSyncStatus = ref<'idle' | 'syncing' | 'synced' | 'local-only'>('idle')
+  const lastCloudSyncAt = ref<string | null>(null)
+
   // Filters & active selections
   const selectedSprintFilter = ref<'sprint-1' | 'sprint-2' | 'sprint-3' | 'ALL'>(loadSelectedSprint())
   const selectedEpicFilter = ref<string>('ALL')
@@ -133,8 +155,10 @@ export const useScrumbanStore = defineStore('scrumban', () => {
   // Admin WIP override toggle (available exclusively to Haziel - ADMIN_PO_SM)
   const adminWipOverrideEnabled = ref<boolean>(false)
 
-  // Modal state
+  // Modal states (Detail, Create/Edit Task, Complete Sprint)
   const activeTaskModalKey = ref<string | null>(null)
+  const isTaskFormModalOpen = ref<boolean>(false)
+  const editingTaskKey = ref<string | null>(null)
   const isCompleteSprintModalOpen = ref<boolean>(false)
 
   // Toast notifications
@@ -154,7 +178,7 @@ export const useScrumbanStore = defineStore('scrumban', () => {
     }
   }
 
-  const persistState = (broadcast = true) => {
+  const persistLocal = (broadcast = true) => {
     try {
       localStorage.setItem(STORAGE_TASKS_KEY, JSON.stringify(tasks.value))
       localStorage.setItem(STORAGE_SPRINTS_KEY, JSON.stringify(sprints.value))
@@ -171,6 +195,97 @@ export const useScrumbanStore = defineStore('scrumban', () => {
     } catch {
       // ignore localStorage quota errors
     }
+  }
+
+  /**
+   * Sincroniza desde Netlify Blobs (/api/scrumban) al abrir la aplicación o refrescar
+   */
+  const syncFromCloud = async (silent = true) => {
+    cloudSyncStatus.value = 'syncing'
+    try {
+      const res = await fetch('/api/scrumban', {
+        method: 'GET',
+        headers: { Accept: 'application/json' }
+      })
+      const contentType = res.headers.get('content-type') || ''
+      if (!res.ok || !contentType.includes('application/json')) {
+        cloudSyncStatus.value = 'local-only'
+        return
+      }
+      const data = await res.json()
+      if (data.ok && data.state && Array.isArray(data.state.tasks)) {
+        tasks.value = data.state.tasks
+        if (Array.isArray(data.state.sprints)) {
+          sprints.value = data.state.sprints
+        }
+        if (Array.isArray(data.state.auditLog)) {
+          auditLog.value = data.state.auditLog
+        }
+        lastCloudSyncAt.value = data.state.updatedAt || new Date().toISOString()
+        persistLocal(true)
+        cloudSyncStatus.value = 'synced'
+        if (!silent) {
+          pushToast(
+            'info',
+            'Sincronizado con Netlify Cloud',
+            'Se descargó el estado más reciente del tablero compartido.'
+          )
+        }
+      } else if (data.ok && data.state === null) {
+        // Primera vez en Netlify Blobs: si el usuario no es Read-Only, inicializamos la nube
+        cloudSyncStatus.value = 'synced'
+        if (!authStore.isReadOnly) {
+          await saveToCloud(false)
+        }
+      }
+    } catch {
+      cloudSyncStatus.value = 'local-only'
+    }
+  }
+
+  /**
+   * Guarda el estado actual en Netlify Blobs (/api/scrumban) validando RBAC en servidor
+   */
+  const saveToCloud = async (isSprintMutation = false) => {
+    persistLocal(true)
+    if (authStore.isReadOnly) return
+
+    cloudSyncStatus.value = 'syncing'
+    try {
+      const res = await fetch('/api/scrumban', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SAVE_STATE',
+          actorRole: authStore.currentUser.rbacRole,
+          actorEmail: authStore.currentUser.email,
+          isSprintMutation,
+          tasks: tasks.value,
+          sprints: sprints.value,
+          auditLog: auditLog.value
+        })
+      })
+      const contentType = res.headers.get('content-type') || ''
+      if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json()
+        if (data.ok) {
+          lastCloudSyncAt.value = data.updatedAt
+          cloudSyncStatus.value = 'synced'
+          return
+        }
+      }
+      cloudSyncStatus.value = 'local-only'
+    } catch {
+      cloudSyncStatus.value = 'local-only'
+    }
+  }
+
+  // Inicializar sincronización con Netlify Cloud al cargar el store
+  if (typeof window !== 'undefined') {
+    syncFromCloud(true)
+    window.addEventListener('focus', () => {
+      syncFromCloud(true)
+    })
   }
 
   const pushToast = (
@@ -202,9 +317,241 @@ export const useScrumbanStore = defineStore('scrumban', () => {
       details
     }
     auditLog.value.unshift(entry)
-    if (auditLog.value.length > 60) {
-      auditLog.value = auditLog.value.slice(0, 60)
+    if (auditLog.value.length > 80) {
+      auditLog.value = auditLog.value.slice(0, 80)
     }
+  }
+
+  // Genera la siguiente clave secuencial PF-XX (ej. PF-25, PF-26...)
+  const getNextTaskKey = (): string => {
+    const nums = tasks.value
+      .map((t) => {
+        const m = t.key.match(/^PF-(\d+)$/i)
+        return m ? parseInt(m[1], 10) : 0
+      })
+      .filter((n) => !Number.isNaN(n))
+    const maxNum = nums.length > 0 ? Math.max(...nums) : 24
+    return `PF-${maxNum + 1}`
+  }
+
+  const openCreateTaskModal = () => {
+    if (authStore.isReadOnly || !authStore.canCreateOrEditTasks) {
+      pushToast(
+        'error',
+        'Permiso RBAC Requerido',
+        'Solo Haziel (PO/SM) o Rodrigo (Tech Lead) pueden crear nuevas historias o tareas en el Backlog.'
+      )
+      return
+    }
+    editingTaskKey.value = null
+    isTaskFormModalOpen.value = true
+  }
+
+  const openEditTaskModal = (taskKey: string) => {
+    if (authStore.isReadOnly || !authStore.canCreateOrEditTasks) {
+      pushToast(
+        'error',
+        'Permiso RBAC Requerido',
+        'Solo Haziel (PO/SM) o Rodrigo (Tech Lead) pueden editar la estructura de una tarea.'
+      )
+      return
+    }
+    editingTaskKey.value = taskKey
+    isTaskFormModalOpen.value = true
+  }
+
+  /**
+   * CRUD: Crear nueva tarea (PF-25, PF-26...)
+   */
+  const createTask = (payload: TaskUpsertPayload): Task | null => {
+    if (authStore.isReadOnly || !authStore.canCreateOrEditTasks) {
+      pushToast(
+        'error',
+        'Acción Bloqueada por RBAC',
+        'Solo ADMIN_PO_SM o TECH_LEAD pueden crear nuevas tareas.'
+      )
+      return null
+    }
+
+    const newKey = getNextTaskKey()
+    const slug = payload.title
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .slice(0, 28)
+
+    const branch =
+      payload.githubBranch && payload.githubBranch.startsWith('feature/PF-')
+        ? payload.githubBranch.trim()
+        : `feature/${newKey}-${slug || 'task'}`
+
+    const newTask: Task = {
+      key: newKey,
+      epicKey: payload.epicKey,
+      title: payload.title.trim(),
+      description: payload.description.trim(),
+      ersCodes: payload.ersCodes,
+      useCases: payload.useCases,
+      assigneeId: payload.assigneeId,
+      coAssigneeId: payload.coAssigneeId || undefined,
+      sprintId: payload.sprintId,
+      columnId: payload.sprintId ? payload.columnId : 'BACKLOG',
+      githubBranch: branch,
+      pullRequestUrl: payload.pullRequestUrl?.trim() || undefined,
+      storyPoints: Number(payload.storyPoints) || 5,
+      priority: payload.priority,
+      layer: payload.layer,
+      acceptanceCriteria:
+        payload.acceptanceCriteria.length > 0
+          ? payload.acceptanceCriteria
+          : ['Cumplir criterios técnicos del ERSIS2026 III y superar revisión QA.'],
+      subtasks: [
+        {
+          id: `${newKey}-sub-1`,
+          title: `Implementar rama ${branch}`,
+          completed: false
+        }
+      ],
+      comments: [],
+      updatedAt: new Date().toISOString()
+    }
+
+    tasks.value.push(newTask)
+    recordAudit(
+      'TASK_CREATED',
+      `Creó la tarea ${newKey}: "${newTask.title}" en ${newTask.epicKey} (${newTask.sprintId ?? 'Backlog'}).`,
+      newKey
+    )
+    saveToCloud(false)
+    isTaskFormModalOpen.value = false
+    pushToast(
+      'success',
+      `Tarea ${newKey} Creada`,
+      `Se registró "${newTask.title}" con trazabilidad ERS.`
+    )
+    return newTask
+  }
+
+  /**
+   * CRUD: Actualizar tarea existente (PF-10 a PF-XX)
+   */
+  const updateTask = (taskKey: string, payload: TaskUpsertPayload): boolean => {
+    if (authStore.isReadOnly || !authStore.canCreateOrEditTasks) {
+      pushToast(
+        'error',
+        'Acción Bloqueada por RBAC',
+        'Solo ADMIN_PO_SM o TECH_LEAD pueden editar los metadatos de una historia.'
+      )
+      return false
+    }
+
+    const task = tasks.value.find((t) => t.key === taskKey)
+    if (!task) return false
+
+    task.title = payload.title.trim()
+    task.description = payload.description.trim()
+    task.epicKey = payload.epicKey
+    task.ersCodes = payload.ersCodes
+    task.useCases = payload.useCases
+    task.assigneeId = payload.assigneeId
+    task.coAssigneeId = payload.coAssigneeId || undefined
+    task.sprintId = payload.sprintId
+    task.columnId = payload.sprintId ? payload.columnId : 'BACKLOG'
+    task.githubBranch = payload.githubBranch.trim()
+    task.pullRequestUrl = payload.pullRequestUrl?.trim() || undefined
+    task.storyPoints = Number(payload.storyPoints) || 5
+    task.priority = payload.priority
+    task.layer = payload.layer
+    task.acceptanceCriteria = payload.acceptanceCriteria
+    task.updatedAt = new Date().toISOString()
+
+    recordAudit(
+      'TASK_UPDATED',
+      `Editó los metadatos y trazabilidad ERS de ${task.key} ("${task.title}").`,
+      task.key
+    )
+    saveToCloud(false)
+    isTaskFormModalOpen.value = false
+    editingTaskKey.value = null
+    pushToast('success', `${task.key} Actualizada`, 'Cambios guardados y sincronizados.')
+    return true
+  }
+
+  /**
+   * CRUD: Eliminar tarea (exclusivo ADMIN_PO_SM o TECH_LEAD)
+   */
+  const deleteTask = (taskKey: string): boolean => {
+    if (authStore.isReadOnly || !authStore.canCreateOrEditTasks) {
+      pushToast(
+        'error',
+        'Permiso Denegado (RBAC)',
+        'Solo Haziel (PO/SM) o Rodrigo (Tech Lead) pueden eliminar tareas.'
+      )
+      return false
+    }
+
+    const idx = tasks.value.findIndex((t) => t.key === taskKey)
+    if (idx === -1) return false
+
+    const removed = tasks.value[idx]
+    tasks.value.splice(idx, 1)
+    if (activeTaskModalKey.value === taskKey) {
+      activeTaskModalKey.value = null
+    }
+
+    recordAudit(
+      'TASK_DELETED',
+      `Eliminó la tarea ${removed.key} ("${removed.title}").`,
+      removed.key
+    )
+    saveToCloud(false)
+    pushToast('info', `Tarea ${removed.key} Eliminada`, 'El tablero ha sido actualizado.')
+    return true
+  }
+
+  /**
+   * CRUD de Subtareas: Agregar y Eliminar subtareas (disponible para todo el equipo excepto GUEST_VIEWER)
+   */
+  const addSubtask = (taskKey: string, subtaskTitle: string): boolean => {
+    if (authStore.isReadOnly) {
+      pushToast(
+        'error',
+        'Modo Solo Lectura',
+        'No se pueden agregar subtareas en modo Evaluador / Invitado.'
+      )
+      return false
+    }
+    const clean = subtaskTitle.trim()
+    if (!clean) return false
+    const task = tasks.value.find((t) => t.key === taskKey)
+    if (!task) return false
+
+    const newSubId = `${task.key}-sub-${Date.now().toString(36)}`
+    task.subtasks.push({
+      id: newSubId,
+      title: clean,
+      completed: false
+    })
+    task.updatedAt = new Date().toISOString()
+    recordAudit('SUBTASK_ADDED', `Agregó subtarea "${clean}" en ${task.key}.`, task.key)
+    saveToCloud(false)
+    return true
+  }
+
+  const deleteSubtask = (taskKey: string, subtaskId: string): boolean => {
+    if (authStore.isReadOnly) return false
+    const task = tasks.value.find((t) => t.key === taskKey)
+    if (!task) return false
+    const sub = task.subtasks.find((s) => s.id === subtaskId)
+    task.subtasks = task.subtasks.filter((s) => s.id !== subtaskId)
+    task.updatedAt = new Date().toISOString()
+    if (sub) {
+      recordAudit('SUBTASK_DELETED', `Eliminó subtarea "${sub.title}" de ${task.key}.`, task.key)
+    }
+    saveToCloud(false)
+    return true
   }
 
   // Computed active sprint object
@@ -380,7 +727,7 @@ export const useScrumbanStore = defineStore('scrumban', () => {
           pushToast(
             'warning',
             `Override WIP Aplicado por ADMIN_PO_SM`,
-            `Haziel Ruiz Zúñiga autorizó exceder temporalmente el límite WIP (${ currentCount + 1 }/${wipLimit}) en ${targetColumn}.`
+            `Haziel Ruiz Zúñiga autorizó exceder temporalmente el límite WIP (${currentCount + 1}/${wipLimit}) en ${targetColumn}.`
           )
         }
       }
@@ -399,7 +746,7 @@ export const useScrumbanStore = defineStore('scrumban', () => {
       `Movió ${task.key} de ${sourceColumn} a ${targetColumn} (Sprint: ${task.sprintId ?? 'Backlog'}).`,
       task.key
     )
-    persistState(true)
+    saveToCloud(false)
 
     pushToast(
       'success',
@@ -412,7 +759,6 @@ export const useScrumbanStore = defineStore('scrumban', () => {
 
   /**
    * Asignar o cambiar el Sprint escalar único de una tarea ('sprint-1' | 'sprint-2' | 'sprint-3' | null)
-   * Impide etiquetas repetidas como "SCRUM Sprint 1, SCRUM Sprint 1"
    */
   const assignTaskToSprint = (taskKey: string, sprintId: SprintId): boolean => {
     if (authStore.isReadOnly) {
@@ -448,7 +794,7 @@ export const useScrumbanStore = defineStore('scrumban', () => {
       `Asignó ${task.key} de forma única a ${sprintId ?? 'Backlog'}.`,
       task.key
     )
-    persistState(true)
+    saveToCloud(false)
     pushToast(
       'info',
       `Sprint actualizado en ${task.key}`,
@@ -483,7 +829,6 @@ export const useScrumbanStore = defineStore('scrumban', () => {
     target.status = 'ACTIVE'
     selectedSprintFilter.value = sprintId
 
-    // Pasar tareas en BACKLOG de este sprint a TO_DO
     tasks.value.forEach((t) => {
       if (t.sprintId === sprintId && t.columnId === 'BACKLOG') {
         t.columnId = 'TO_DO'
@@ -491,7 +836,7 @@ export const useScrumbanStore = defineStore('scrumban', () => {
     })
 
     recordAudit('SPRINT_STARTED', `Haziel (ADMIN_PO_SM) inició oficialmente ${target.name}.`)
-    persistState(true)
+    saveToCloud(true)
     pushToast('success', 'Sprint Iniciado', `${target.name} ahora está ACTIVO.`)
     return true
   }
@@ -520,7 +865,6 @@ export const useScrumbanStore = defineStore('scrumban', () => {
     const completedTasks = sprintTasks.filter((t) => t.columnId === 'DONE')
     const pendingTasks = sprintTasks.filter((t) => t.columnId !== 'DONE')
 
-    // Reasignar escalarmente tareas pendientes al siguiente Sprint sin duplicar etiquetas
     pendingTasks.forEach((t) => {
       if (nextSprintId) {
         t.sprintId = nextSprintId
@@ -538,7 +882,6 @@ export const useScrumbanStore = defineStore('scrumban', () => {
       const nextSprint = sprints.value.find((s) => s.id === nextSprintId)
       if (nextSprint) {
         nextSprint.status = 'ACTIVE'
-        // Activar las tareas del nuevo Sprint en TO_DO si estaban en BACKLOG
         tasks.value.forEach((t) => {
           if (t.sprintId === nextSprintId && t.columnId === 'BACKLOG') {
             t.columnId = 'TO_DO'
@@ -554,7 +897,7 @@ export const useScrumbanStore = defineStore('scrumban', () => {
       'SPRINT_COMPLETED',
       `Haziel (ADMIN_PO_SM) completó ${currentSprint.name}. Completadas: ${completedTasks.length}, Transferidas a ${nextSprintId ?? 'Backlog'}: ${pendingTasks.length}.`
     )
-    persistState(true)
+    saveToCloud(true)
 
     pushToast(
       'success',
@@ -582,7 +925,7 @@ export const useScrumbanStore = defineStore('scrumban', () => {
 
     Object.assign(s, payload)
     recordAudit('SPRINT_UPDATED', `Actualizó metadatos de ${s.name}.`)
-    persistState(true)
+    saveToCloud(true)
     pushToast('success', 'Sprint Actualizado', 'Los cambios del Sprint fueron guardados.')
     return true
   }
@@ -607,7 +950,7 @@ export const useScrumbanStore = defineStore('scrumban', () => {
       `${sub.completed ? 'Completó' : 'Reabrió'} subtarea "${sub.title}" en ${task.key}.`,
       task.key
     )
-    persistState(true)
+    saveToCloud(false)
   }
 
   const updateTaskGitInfo = (
@@ -629,7 +972,7 @@ export const useScrumbanStore = defineStore('scrumban', () => {
       `Vinculó rama ${task.githubBranch} ${task.pullRequestUrl ? `y PR ${task.pullRequestUrl}` : ''} en ${task.key}.`,
       task.key
     )
-    persistState(true)
+    saveToCloud(false)
     pushToast('success', 'Vínculo GitHub Actualizado', `Rama y PR guardados en ${task.key}.`)
     return true
   }
@@ -658,16 +1001,16 @@ export const useScrumbanStore = defineStore('scrumban', () => {
     })
     task.updatedAt = new Date().toISOString()
     recordAudit('COMMENT_ADDED', `Comentó en ${task.key}: "${trimmed.slice(0, 50)}..."`, task.key)
-    persistState(true)
+    saveToCloud(false)
     return true
   }
 
   const resetToOfficialSeed = () => {
-    if (authStore.isReadOnly) {
+    if (authStore.currentUser.rbacRole !== 'ADMIN_PO_SM') {
       pushToast(
         'error',
-        'Modo Solo Lectura',
-        'Cambia a un rol del equipo para restaurar los datos semilla.'
+        'Exclusivo ADMIN_PO_SM',
+        'Solo Haziel Ruiz Zúñiga (PO/SM) puede restaurar el estado semilla oficial en la nube.'
       )
       return
     }
@@ -681,9 +1024,9 @@ export const useScrumbanStore = defineStore('scrumban', () => {
     searchQuery.value = ''
     recordAudit(
       'SEED_RESTORED',
-      'Restauró los datos semilla oficiales de PARK FLOW (PF-5 a PF-24 y ERSIS2026 III).'
+      'Haziel (ADMIN_PO_SM) restauró los datos semilla oficiales de PARK FLOW (PF-5 a PF-24 y ERSIS2026 III).'
     )
-    persistState(true)
+    saveToCloud(true)
     pushToast(
       'info',
       'Datos Semilla Restaurados',
@@ -747,6 +1090,8 @@ export const useScrumbanStore = defineStore('scrumban', () => {
     ersRequirements,
     columns,
     auditLog,
+    cloudSyncStatus,
+    lastCloudSyncAt,
     selectedSprintFilter,
     selectedEpicFilter,
     selectedLayerFilter,
@@ -755,12 +1100,23 @@ export const useScrumbanStore = defineStore('scrumban', () => {
     searchQuery,
     adminWipOverrideEnabled,
     activeTaskModalKey,
+    isTaskFormModalOpen,
+    editingTaskKey,
     isCompleteSprintModalOpen,
     toasts,
     activeSprint,
     currentViewedSprint,
     filteredTasks,
     boardMetrics,
+    getNextTaskKey,
+    openCreateTaskModal,
+    openEditTaskModal,
+    createTask,
+    updateTask,
+    deleteTask,
+    addSubtask,
+    deleteSubtask,
+    syncFromCloud,
     getTasksByColumn,
     getWipCountForColumn,
     getColumnWipLimit,

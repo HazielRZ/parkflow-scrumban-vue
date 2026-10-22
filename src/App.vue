@@ -9,6 +9,7 @@ import {
 } from 'lucide-vue-next'
 import NavbarSprintHeader from '@/components/NavbarSprintHeader.vue'
 import TaskDetailModal from '@/components/TaskDetailModal.vue'
+import TaskFormModal from '@/components/TaskFormModal.vue'
 import { useScrumbanStore } from '@/stores/useScrumbanStore'
 
 const scrumbanStore = useScrumbanStore()
@@ -25,8 +26,11 @@ const route = useRoute()
       <router-view />
     </main>
 
-    <!-- Modal de Detalle de Tarea (PF-10 a PF-24) -->
+    <!-- Modal de Detalle de Tarea (PF-10 a PF-XX) -->
     <TaskDetailModal />
+
+    <!-- Modal CRUD de Creación / Edición de Tarea (PF-25+) -->
+    <TaskFormModal />
 
     <!-- Sistema de Notificaciones Toast (Límites WIP, RBAC y Confirmaciones) -->
     <div
