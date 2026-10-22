@@ -322,33 +322,7 @@ const handleGuestInstantAccess = () => {
             </div>
           </div>
 
-          <!-- Resumen de Reglas Operativas Protegidas -->
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3.5">
-              <p class="text-xs font-bold text-emerald-400 mb-1">
-                Protección Anti-Cierre de Sprint
-              </p>
-              <p class="text-[11px] text-slate-400">
-                Únicamente <strong>Haziel Ruiz Zúñiga</strong> (`ADMIN_PO_SM`) puede iniciar o completar Sprints (validado en UI y Netlify Function).
-              </p>
-            </div>
-            <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3.5">
-              <p class="text-xs font-bold text-amber-400 mb-1">
-                Persistencia Cloud Netlify Blobs
-              </p>
-              <p class="text-[11px] text-slate-400">
-                Todas las historias, Sprints y comentarios se guardan en la nube de Netlify ($0 MXN) para los 5 integrantes.
-              </p>
-            </div>
-            <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3.5">
-              <p class="text-xs font-bold text-cyan-400 mb-1">
-                Trazabilidad ERSIS2026 III
-              </p>
-              <p class="text-[11px] text-slate-400">
-                5 Épicas (`PF-5` a `PF-9`), CRUD de tareas (`PF-10`+) y 22 Requisitos (`OT-01` incluido).
-              </p>
-            </div>
-          </div>
+
         </div>
       </div>
     </main>
