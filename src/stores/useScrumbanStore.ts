@@ -244,9 +244,20 @@ export const useScrumbanStore = defineStore('scrumban', () => {
   }
 
   /**
-   * Guarda el estado actual en Netlify Blobs (/api/scrumban) validando RBAC en servidor
+   * Guarda el estado actual en Netlify Blobs (/api/scrumban) enviando el token
+   * criptográfico HMAC-SHA256 y validando RBAC en servidor.
    */
   const saveToCloud = async (isSprintMutation = false) => {
+    if (!authStore.verifyIntegrityOrRevoke()) {
+      pushToast(
+        'error',
+        'Alerta de Seguridad (Sesión Inválida)',
+        'Se detectó manipulación local de la sesión en DevTools. Tus cambios fueron revertidos.'
+      )
+      await syncFromCloud(true)
+      return
+    }
+
     persistLocal(true)
     if (authStore.isReadOnly) return
 
@@ -254,11 +265,13 @@ export const useScrumbanStore = defineStore('scrumban', () => {
     try {
       const res = await fetch('/api/scrumban', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authStore.sessionToken}`
+        },
         body: JSON.stringify({
           action: 'SAVE_STATE',
-          actorRole: authStore.currentUser.rbacRole,
-          actorEmail: authStore.currentUser.email,
+          sessionToken: authStore.sessionToken,
           isSprintMutation,
           tasks: tasks.value,
           sprints: sprints.value,
@@ -266,11 +279,20 @@ export const useScrumbanStore = defineStore('scrumban', () => {
         })
       })
       const contentType = res.headers.get('content-type') || ''
-      if (res.ok && contentType.includes('application/json')) {
+      if (contentType.includes('application/json')) {
         const data = await res.json()
-        if (data.ok) {
+        if (res.ok && data.ok) {
           lastCloudSyncAt.value = data.updatedAt
           cloudSyncStatus.value = 'synced'
+          return
+        }
+        if (res.status === 401 || res.status === 403) {
+          pushToast(
+            'error',
+            'Acción Rechazada por el Servidor',
+            data.message || 'No tienes autorización para realizar esta operación.'
+          )
+          await syncFromCloud(true)
           return
         }
       }
