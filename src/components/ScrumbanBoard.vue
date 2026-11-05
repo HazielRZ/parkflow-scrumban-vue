@@ -172,7 +172,7 @@ const clearFilters = () => {
           v-model="scrumbanStore.selectedAssigneeFilter"
           class="rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 focus:border-emerald-500 focus:outline-none"
         >
-          <option value="ALL">Todos los Integrantes (5)</option>
+          <option value="ALL">Todos los Integrantes (6)</option>
           <option
             v-for="m in authStore.members.filter((x) => x.rbacRole !== 'GUEST_VIEWER')"
             :key="m.id"

@@ -108,6 +108,19 @@ export const TEAM_MEMBERS_SEED: TeamMember[] = [
       'Actualizar progreso de sus tareas (Por hacer -> En progreso -> En revisión), registrar subtareas, comentarios y ramas feature/PF-XX. No puede cerrar Sprints ni auto-aprobar Code Review.'
   },
   {
+    id: 'member-christopher',
+    name: 'Christopher Daniel Díaz López',
+    controlNumber: '23121070',
+    email: 'l23121070@morelia.tecnm.mx',
+    alternateEmails: ['23121070'],
+    projectRole: 'Software & Full-Stack Developer',
+    rbacRole: 'DEVELOPER',
+    avatarInitials: 'CD',
+    avatarColor: 'bg-teal-600 text-white ring-teal-400',
+    permissionsSummary:
+      'Actualizar progreso de sus tareas (Por hacer -> En progreso -> En revisión), registrar subtareas, comentarios y ramas feature/PF-XX. No puede cerrar Sprints ni auto-aprobar Code Review.'
+  },
+  {
     id: 'member-guest',
     name: 'Prof. Alma Lilia Núñez González / Invitado',
     controlNumber: 'Docente / Eval.',
