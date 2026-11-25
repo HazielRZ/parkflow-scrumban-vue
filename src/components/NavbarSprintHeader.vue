@@ -43,12 +43,11 @@ const sprintCompletionSummary = computed(() => {
   const allTasks = scrumbanStore.tasks.filter((t) => t.sprintId === sp.id)
   const completed = allTasks.filter((t) => t.columnId === 'DONE')
   const pending = allTasks.filter((t) => t.columnId !== 'DONE')
+  const currentIdx = scrumbanStore.sprints.findIndex((s) => s.id === sp.id)
   const nextSprintLabel =
-    sp.id === 'sprint-1'
-      ? 'Sprint 2'
-      : sp.id === 'sprint-2'
-        ? 'Sprint 3'
-        : 'Product Backlog'
+    currentIdx >= 0 && currentIdx < scrumbanStore.sprints.length - 1
+      ? `Sprint ${currentIdx + 2}`
+      : 'Product Backlog'
 
   return {
     sprint: sp,
@@ -387,7 +386,7 @@ const handleLogout = () => {
                 class="w-full flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition"
               >
                 <RotateCcw class="h-3.5 w-3.5" />
-                Restaurar Semilla Oficial (PF-5 a PF-24)
+                Restaurar Semilla Oficial (PF-5 a PF-32)
               </button>
 
               <button

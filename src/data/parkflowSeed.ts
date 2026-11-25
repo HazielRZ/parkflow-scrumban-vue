@@ -87,12 +87,12 @@ export const TEAM_MEMBERS_SEED: TeamMember[] = [
     name: 'Julio Armando Martínez Equihua',
     controlNumber: '23121112',
     email: 'l23121112@morelia.tecnm.mx',
-    projectRole: 'Computer Vision & Backend Developer',
+    projectRole: 'Computer Vision & Backend Developer (Baja del proyecto)',
     rbacRole: 'DEVELOPER',
     avatarInitials: 'JM',
     avatarColor: 'bg-sky-600 text-white ring-sky-400',
-    permissionsSummary:
-      'Actualizar progreso de sus tareas (Por hacer -> En progreso -> En revisión), registrar subtareas, comentarios y ramas feature/PF-XX. No puede cerrar Sprints ni auto-aprobar Code Review.'
+    permissionsSummary: 'Acceso revocado por baja del proyecto.',
+    inactive: true
   },
   {
     id: 'member-luis',
@@ -100,12 +100,12 @@ export const TEAM_MEMBERS_SEED: TeamMember[] = [
     controlNumber: '24120432',
     email: 'l24121432@morelia.tecnm.mx',
     alternateEmails: ['l24120432@morelia.tecnm.mx', '24120432'],
-    projectRole: 'Full-Stack & Frontend Developer',
+    projectRole: 'Full-Stack & Frontend Developer (Baja del proyecto)',
     rbacRole: 'DEVELOPER',
     avatarInitials: 'LA',
     avatarColor: 'bg-amber-600 text-white ring-amber-400',
-    permissionsSummary:
-      'Actualizar progreso de sus tareas (Por hacer -> En progreso -> En revisión), registrar subtareas, comentarios y ramas feature/PF-XX. No puede cerrar Sprints ni auto-aprobar Code Review.'
+    permissionsSummary: 'Acceso revocado por baja del proyecto.',
+    inactive: true
   },
   {
     id: 'member-christopher',
@@ -403,6 +403,22 @@ export const SPRINTS_SEED: Sprint[] = [
     startDate: '2026-11-09',
     endDate: '2026-11-22',
     status: 'PLANNED'
+  },
+  {
+    id: 'sprint-4',
+    name: 'Sprint 4 — Integración End-to-End, Optimización Nocturna/Lluvia y Resiliencia Operativa',
+    goal: 'Integrar de extremo a extremo /cv-service, /api-backend y /client-app con el equipo activo de 4 integrantes, calibrar precisión YOLO >= 90% en noche/lluvia (RNF-07) y certificar latencia <= 3 s en WebSockets (RNF-01).',
+    startDate: '2026-11-23',
+    endDate: '2026-12-06',
+    status: 'PLANNED'
+  },
+  {
+    id: 'sprint-5',
+    name: 'Sprint 5 — Auditoría Ética OT-01, Alta Disponibilidad 99%, UAT y Entrega Final',
+    goal: 'Certificar cumplimiento estricto de privacidad sin captura facial (OT-01), disponibilidad >= 99% en horario pico (RNF-04), validación UAT de CU-01 a CU-05 y liberación final v1.0.0.',
+    startDate: '2026-12-07',
+    endDate: '2026-12-18',
+    status: 'PLANNED'
   }
 ]
 
@@ -526,7 +542,8 @@ export const TASKS_SEED: Task[] = [
       'Desarrollar lector asíncrono de streams RTSP en OpenCV con reconexión automática, buffer sin acumulación de lag y soporte para resoluciones HD (720p y 1080p).',
     ersCodes: ['INT-HW-01', 'INT-COM-01', 'RNF-01'],
     useCases: [],
-    assigneeId: 'member-julio',
+    assigneeId: 'member-rodrigo',
+    coAssigneeId: 'member-miguel',
     sprintId: 'sprint-1',
     columnId: 'IN_PROGRESS',
     githubBranch: 'feature/PF-13-rtsp-ingestion',
@@ -554,7 +571,8 @@ export const TASKS_SEED: Task[] = [
       'Implementar detección vehicular con YOLO y cálculo de intersección sobre polígonos calibrados (IoU) clasificando cada cajón en Libre, Ocupado o En maniobra, cumpliendo estrictamente OT-01 (cero almacenamiento facial o seguimiento peatonal).',
     ersCodes: ['RF-03', 'RNF-07', 'OT-01'],
     useCases: ['CU-02'],
-    assigneeId: 'member-julio',
+    assigneeId: 'member-rodrigo',
+    coAssigneeId: 'member-christopher',
     sprintId: 'sprint-1',
     columnId: 'IN_PROGRESS',
     githubBranch: 'feature/PF-14-yolo-polygon-inference',
@@ -609,7 +627,8 @@ export const TASKS_SEED: Task[] = [
       'Publicar cambios de estado detectados en /cv-service hacia /api-backend en formato JSON ligero en <= 5 segundos y ejecutar batería de pruebas de precisión diurna/nocturna.',
     ersCodes: ['INT-SW-01', 'RNF-01', 'RNF-07'],
     useCases: [],
-    assigneeId: 'member-julio',
+    assigneeId: 'member-rodrigo',
+    coAssigneeId: 'member-miguel',
     sprintId: 'sprint-2',
     columnId: 'BACKLOG',
     githubBranch: 'feature/PF-15-cv-json-publisher',
@@ -635,7 +654,8 @@ export const TASKS_SEED: Task[] = [
       'Construir gestor de conexiones WebSockets por Campus y Zona en FastAPI para difundir instantáneamente cambios de disponibilidad hacia la PWA móvil y paneles LED en menos de 3 segundos.',
     ersCodes: ['INT-COM-01', 'RNF-01'],
     useCases: [],
-    assigneeId: 'member-julio',
+    assigneeId: 'member-christopher',
+    coAssigneeId: 'member-rodrigo',
     sprintId: 'sprint-2',
     columnId: 'BACKLOG',
     githubBranch: 'feature/PF-17-websockets-realtime',
@@ -661,7 +681,8 @@ export const TASKS_SEED: Task[] = [
       'Integrar webhook/API para pulsos de sensores y plumas de acceso vehicular (INT-HW-02) y permitir que personal de Vigilancia o Administración fuerce manualmente el estado de un cajón por obras, reserva o emergencia (RF-03).',
     ersCodes: ['INT-HW-02', 'RF-03'],
     useCases: ['CU-02', 'CU-05'],
-    assigneeId: 'member-julio',
+    assigneeId: 'member-christopher',
+    coAssigneeId: 'member-haziel',
     sprintId: 'sprint-2',
     columnId: 'BACKLOG',
     githubBranch: 'feature/PF-18-barriers-manual-override',
@@ -688,7 +709,7 @@ export const TASKS_SEED: Task[] = [
       'Desarrollar aplicación web progresiva para estudiantes y conductores con mapa interactivo de cajones codificado por colores (Verde: Libre, Rojo: Ocupado, Amarillo: En maniobra) accesible en máximo 3 toques.',
     ersCodes: ['INT-UI-01', 'RF-01', 'RNF-03', 'RNF-06'],
     useCases: ['CU-01'],
-    assigneeId: 'member-luis',
+    assigneeId: 'member-christopher',
     sprintId: 'sprint-2',
     columnId: 'BACKLOG',
     githubBranch: 'feature/PF-19-mobile-pwa-map',
@@ -715,7 +736,7 @@ export const TASKS_SEED: Task[] = [
       'Preseleccionar automáticamente el turno activo según la hora del dispositivo (Matutino 06:50-14:00 / Vespertino 14:00-21:00) y ofrecer selector rápido entre Campus 1 y Campus 2 del TecNM Morelia.',
     ersCodes: ['RF-02'],
     useCases: ['CU-01'],
-    assigneeId: 'member-luis',
+    assigneeId: 'member-christopher',
     sprintId: 'sprint-2',
     columnId: 'BACKLOG',
     githubBranch: 'feature/PF-20-campus-shift-filter',
@@ -741,7 +762,8 @@ export const TASKS_SEED: Task[] = [
       'Mostrar alerta visual prioritaria ("ESTACIONAMIENTO CASI LLENO" al >= 90% y "ESTACIONAMIENTO LLENO" al 100%) sugiriendo zonas o accesos alternos dentro del campus.',
     ersCodes: ['RF-04'],
     useCases: ['CU-03'],
-    assigneeId: 'member-luis',
+    assigneeId: 'member-christopher',
+    coAssigneeId: 'member-haziel',
     sprintId: 'sprint-3',
     columnId: 'BACKLOG',
     githubBranch: 'feature/PF-21-mobile-saturation-alert',
@@ -768,7 +790,7 @@ export const TASKS_SEED: Task[] = [
     ersCodes: ['INT-UI-02', 'RF-06'],
     useCases: ['CU-02'],
     assigneeId: 'member-rodrigo',
-    coAssigneeId: 'member-luis',
+    coAssigneeId: 'member-christopher',
     sprintId: 'sprint-3',
     columnId: 'BACKLOG',
     githubBranch: 'feature/PF-22-polygon-calibration-ui',
@@ -795,7 +817,8 @@ export const TASKS_SEED: Task[] = [
       'Diseñar modo quiosco de alto contraste para paneles informativos físicos LED ubicados en accesos y bifurcaciones del campus, mostrando conteo de cajones libres por zona y alerta cuando la ocupación supere el 90%.',
     ersCodes: ['INT-UI-03', 'RF-04'],
     useCases: ['CU-03'],
-    assigneeId: 'member-luis',
+    assigneeId: 'member-christopher',
+    coAssigneeId: 'member-miguel',
     sprintId: 'sprint-3',
     columnId: 'BACKLOG',
     githubBranch: 'feature/PF-23-led-display-view',
@@ -840,5 +863,235 @@ export const TASKS_SEED: Task[] = [
     ],
     comments: [],
     updatedAt: '2026-10-19T13:20:00-06:00'
+  },
+  {
+    key: 'PF-25',
+    epicKey: 'PF-6',
+    title: 'Optimizar inferencia YOLO + OpenCV en iluminación nocturna y lluvia moderada (>= 90% accuracy)',
+    description:
+      'Aplicar preprocesamiento CLAHE, ajuste adaptativo de exposición sobre streams RTSP y reevaluación de umbrales de confianza YOLO para sostener precisión >= 95% de día y >= 90% en noche o lluvia moderada sin captura facial (OT-01).',
+    ersCodes: ['RNF-07', 'INT-HW-01', 'OT-01'],
+    useCases: ['CU-02'],
+    assigneeId: 'member-rodrigo',
+    coAssigneeId: 'member-miguel',
+    sprintId: 'sprint-4',
+    columnId: 'BACKLOG',
+    githubBranch: 'feature/PF-25-night-rain-cv-tuning',
+    storyPoints: 8,
+    priority: 'Crítica',
+    layer: '/cv-service',
+    acceptanceCriteria: [
+      'Accuracy por cajón >= 95% en luz diurna natural y >= 90% en iluminación nocturna o lluvia moderada (RNF-07).',
+      'Preprocesamiento CLAHE sin incrementar la latencia de inferencia por encima de 5 s.',
+      'Cumplimiento verificado de OT-01 (descarte exclusivo a clases vehiculares).'
+    ],
+    subtasks: [
+      { id: 'PF-25-sub-1', title: 'Implementar pipeline de mejora de contraste CLAHE sobre frames RTSP', completed: false },
+      { id: 'PF-25-sub-2', title: 'Ejecutar matriz de confusión con dataset nocturno y de lluvia', completed: false },
+      { id: 'PF-25-sub-3', title: 'Ajustar suavizado temporal para evitar falsos positivos por reflejos', completed: false }
+    ],
+    comments: [],
+    updatedAt: '2026-11-25T12:00:00-06:00'
+  },
+  {
+    key: 'PF-26',
+    epicKey: 'PF-7',
+    title: 'Integración End-to-End CV -> FastAPI -> WebSockets y pruebas de estrés de latencia (<= 3 s)',
+    description:
+      'Ejecutar pruebas integrales entre /cv-service, /api-backend y sensores/barreras físicas verificando propagación JSON <= 5 s, difusión WebSockets <= 3 s (RNF-01) y consistencia de aforo global.',
+    ersCodes: ['RNF-01', 'INT-SW-01', 'INT-COM-01', 'INT-HW-02'],
+    useCases: ['CU-01', 'CU-05'],
+    assigneeId: 'member-miguel',
+    coAssigneeId: 'member-rodrigo',
+    sprintId: 'sprint-4',
+    columnId: 'BACKLOG',
+    githubBranch: 'feature/PF-26-e2e-latency-stress-tests',
+    storyPoints: 8,
+    priority: 'Crítica',
+    layer: '/api-backend',
+    acceptanceCriteria: [
+      'Propagación completa desde detección CV hasta API backend en <= 5 s.',
+      'Difusión WebSockets hacia clientes concurrentes en <= 3 s bajo carga pico (RNF-01).',
+      'Sincronización consistente con eventos de barreras de acceso (INT-HW-02).'
+    ],
+    subtasks: [
+      { id: 'PF-26-sub-1', title: 'Configurar suite automatizada de carga WebSockets (k6 / locust)', completed: false },
+      { id: 'PF-26-sub-2', title: 'Validar contrato JSON end-to-end entre /cv-service y /api-backend', completed: false },
+      { id: 'PF-26-sub-3', title: 'Certificar conciliación automática de aforo con barreras físicas', completed: false }
+    ],
+    comments: [],
+    updatedAt: '2026-11-25T12:00:00-06:00'
+  },
+  {
+    key: 'PF-27',
+    epicKey: 'PF-8',
+    title: 'Consolidar PWA móvil multiplataforma (Android/iOS) en <= 3 pasos y resiliencia ante microcortes',
+    description:
+      'Optimizar la PWA de conductores para Chrome en Android y Safari en iOS garantizando consulta de cajones en <= 3 pasos (RNF-03), caché offline del último snapshot e indicador de reconexión WebSocket en vivo.',
+    ersCodes: ['INT-UI-01', 'RF-01', 'RF-02', 'RNF-03', 'RNF-06'],
+    useCases: ['CU-01', 'CU-03'],
+    assigneeId: 'member-christopher',
+    coAssigneeId: 'member-haziel',
+    sprintId: 'sprint-4',
+    columnId: 'BACKLOG',
+    githubBranch: 'feature/PF-27-pwa-crossplatform-resilience',
+    storyPoints: 8,
+    priority: 'Alta',
+    layer: '/client-app',
+    acceptanceCriteria: [
+      'Flujo completo de consulta de disponibilidad en máximo 3 toques desde la apertura (RNF-03).',
+      'Pruebas exitosas de renderizado y WebSockets en Android Chrome e iOS Safari (RNF-06).',
+      'Indicador visual de reconexión y fallback transparente al snapshot REST.'
+    ],
+    subtasks: [
+      { id: 'PF-27-sub-1', title: 'Configurar Service Worker y caché de snapshot REST en PWA', completed: false },
+      { id: 'PF-27-sub-2', title: 'Validar usabilidad en <= 3 pasos y diseño responsive Android/iOS', completed: false },
+      { id: 'PF-27-sub-3', title: 'Implementar reconexión exponencial WebSocket con estado en vivo', completed: false }
+    ],
+    comments: [],
+    updatedAt: '2026-11-25T12:00:00-06:00'
+  },
+  {
+    key: 'PF-28',
+    epicKey: 'PF-9',
+    title: 'Integrar recarga en caliente de polígonos calibrados y sincronización en vivo con Paneles LED',
+    description:
+      'Conectar el guardado de coordenadas poligonales del Dashboard operativo con /cv-service mediante recarga en caliente sin reinicio y propagar instantáneamente los contadores y alertas >= 90% hacia la vista LED.',
+    ersCodes: ['INT-UI-02', 'INT-UI-03', 'RF-04', 'RF-06'],
+    useCases: ['CU-02', 'CU-03'],
+    assigneeId: 'member-christopher',
+    coAssigneeId: 'member-rodrigo',
+    sprintId: 'sprint-4',
+    columnId: 'BACKLOG',
+    githubBranch: 'feature/PF-28-live-polygon-led-sync',
+    storyPoints: 5,
+    priority: 'Alta',
+    layer: '/client-app',
+    acceptanceCriteria: [
+      'Actualización de polígonos en /cv-service en caliente sin detener el stream RTSP.',
+      'Sincronización inmediata de zonas editadas con los contadores de los Paneles LED.',
+      'Activación automática de alerta >= 90% coherente entre móvil y LED.'
+    ],
+    subtasks: [
+      { id: 'PF-28-sub-1', title: 'Implementar endpoint y señal de hot-reload de polígonos en /cv-service', completed: false },
+      { id: 'PF-28-sub-2', title: 'Validar actualización simultánea en Dashboard y Paneles LED', completed: false }
+    ],
+    comments: [],
+    updatedAt: '2026-11-25T12:00:00-06:00'
+  },
+  {
+    key: 'PF-29',
+    epicKey: 'PF-6',
+    title: 'Auditoría técnica y certificación de privacidad sin captura facial ni seguimiento peatonal (OT-01)',
+    description:
+      'Ejecutar auditoría formal del código y logs de /cv-service y PostgreSQL para certificar que ningún frame, rostro o trayectoria peatonal es almacenada o procesada fuera de la presencia vehicular en polígonos.',
+    ersCodes: ['OT-01', 'RNF-02'],
+    useCases: ['CU-02'],
+    assigneeId: 'member-haziel',
+    coAssigneeId: 'member-miguel',
+    sprintId: 'sprint-5',
+    columnId: 'BACKLOG',
+    githubBranch: 'feature/PF-29-ot01-privacy-audit',
+    storyPoints: 5,
+    priority: 'Crítica',
+    layer: '/cv-service',
+    acceptanceCriteria: [
+      'Verificación de descarte explícito de clase person y ausencia de guardado de video/frames.',
+      'Enmascaramiento de zonas externas a los polígonos calibrados.',
+      'Acta de cumplimiento ético-legal OT-01 firmada para entrega ERSIS2026 III.'
+    ],
+    subtasks: [
+      { id: 'PF-29-sub-1', title: 'Auditar pipeline /cv-service verificando cero persistencia de frames/rostros', completed: false },
+      { id: 'PF-29-sub-2', title: 'Aplicar máscara poligonal previa a registro de telemetría', completed: false },
+      { id: 'PF-29-sub-3', title: 'Generar evidencia documental de cumplimiento OT-01', completed: false }
+    ],
+    comments: [],
+    updatedAt: '2026-11-25T12:00:00-06:00'
+  },
+  {
+    key: 'PF-30',
+    epicKey: 'PF-5',
+    title: 'Hardening de contenedores Docker, monitoreo de salud y validación de Uptime >= 99% en horario pico',
+    description:
+      'Reforzar configuración de contenedores Docker, alertas de salud, rotación de logs y respaldos automáticos de PostgreSQL para garantizar disponibilidad operativa >= 99% de 06:50 a 21:00 hrs en Campus 1 y Campus 2.',
+    ersCodes: ['RNF-04', 'RNF-05', 'INT-SW-02'],
+    useCases: [],
+    assigneeId: 'member-miguel',
+    coAssigneeId: 'member-rodrigo',
+    sprintId: 'sprint-5',
+    columnId: 'BACKLOG',
+    githubBranch: 'feature/PF-30-ha-uptime-monitoring',
+    storyPoints: 8,
+    priority: 'Alta',
+    layer: '/api-backend',
+    acceptanceCriteria: [
+      'Pruebas de recuperación automática ante caída simulada de /cv-service o /api-backend.',
+      'Script automatizado de respaldo y restauración de PostgreSQL verificado.',
+      'Tablero de monitoreo de disponibilidad cumpliendo meta >= 99% (RNF-04).'
+    ],
+    subtasks: [
+      { id: 'PF-30-sub-1', title: 'Configurar healthchecks Liveness/Readiness y políticas de reinicio', completed: false },
+      { id: 'PF-30-sub-2', title: 'Automatizar backup diario de PostgreSQL y rotación de logs', completed: false },
+      { id: 'PF-30-sub-3', title: 'Ejecutar simulación de falla y medir tiempo de recuperación (MTTR)', completed: false }
+    ],
+    comments: [],
+    updatedAt: '2026-11-25T12:00:00-06:00'
+  },
+  {
+    key: 'PF-31',
+    epicKey: 'PF-9',
+    title: 'Validación integral de reportes ejecutivos PDF/CSV y consola de sobrescritura manual para Vigilancia',
+    description:
+      'Realizar pruebas integrales de generación de reportes históricos por campus, turno, horas pico, estancia y rotación en PDF/CSV (RF-05) junto con la consola auditada de sobrescritura manual para Vigilancia (RF-03).',
+    ersCodes: ['RF-03', 'RF-05', 'INT-SW-02', 'RNF-02'],
+    useCases: ['CU-02', 'CU-04', 'CU-05'],
+    assigneeId: 'member-christopher',
+    coAssigneeId: 'member-haziel',
+    sprintId: 'sprint-5',
+    columnId: 'BACKLOG',
+    githubBranch: 'feature/PF-31-reports-vigilancia-uat',
+    storyPoints: 8,
+    priority: 'Alta',
+    layer: '/client-app',
+    acceptanceCriteria: [
+      'Descarga limpia de reportes PDF institucionales y CSV sin caracteres corruptos (CU-04).',
+      'Registro en bitácora RBAC de cada sobrescritura manual de Vigilancia/Admin (CU-05).',
+      'Restricción estricta de permisos de exportación y edición mediante @morelia.tecnm.mx.'
+    ],
+    subtasks: [
+      { id: 'PF-31-sub-1', title: 'Validar métricas de horas pico, estancia promedio y rotación en PDF/CSV', completed: false },
+      { id: 'PF-31-sub-2', title: 'Probar bloqueo y desbloqueo manual de cajones desde rol Vigilancia', completed: false }
+    ],
+    comments: [],
+    updatedAt: '2026-11-25T12:00:00-06:00'
+  },
+  {
+    key: 'PF-32',
+    epicKey: 'PF-5',
+    title: 'Pruebas de Aceptación (UAT), documentación de despliegue y liberación final ERSIS2026 III',
+    description:
+      'Ejecutar protocolo completo de Pruebas de Aceptación de Usuario (CU-01 a CU-05) con los 4 integrantes activos, verificar cobertura del 100% de los 22 requisitos del ERSIS2026 III y etiquetar versión final v1.0.0.',
+    ersCodes: ['RNF-03', 'RNF-05', 'RNF-06', 'RF-01'],
+    useCases: ['CU-01', 'CU-02', 'CU-03', 'CU-04', 'CU-05'],
+    assigneeId: 'member-haziel',
+    coAssigneeId: 'member-rodrigo',
+    sprintId: 'sprint-5',
+    columnId: 'BACKLOG',
+    githubBranch: 'feature/PF-32-final-release-uat',
+    storyPoints: 5,
+    priority: 'Crítica',
+    layer: '/client-app',
+    acceptanceCriteria: [
+      'Casos de uso CU-01 a CU-05 ejecutados y aprobados sin bloqueantes.',
+      'Matriz de trazabilidad ERSIS2026 III al 100% de cobertura en historias terminadas.',
+      'Manual de operación, despliegue Docker/Netlify y tag v1.0.0 publicado.'
+    ],
+    subtasks: [
+      { id: 'PF-32-sub-1', title: 'Ejecutar checklist UAT de CU-01 a CU-05 con evidencias', completed: false },
+      { id: 'PF-32-sub-2', title: 'Consolidar manual técnico de instalación y operación', completed: false },
+      { id: 'PF-32-sub-3', title: 'Publicar release v1.0.0 y presentar cierre final a docente evaluadora', completed: false }
+    ],
+    comments: [],
+    updatedAt: '2026-11-25T12:00:00-06:00'
   }
 ]

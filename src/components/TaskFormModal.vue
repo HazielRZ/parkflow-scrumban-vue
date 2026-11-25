@@ -284,9 +284,13 @@ const handleSubmit = () => {
               v-model="sprintId"
               class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
             >
-              <option :value="'sprint-1'">Sprint 1</option>
-              <option :value="'sprint-2'">Sprint 2</option>
-              <option :value="'sprint-3'">Sprint 3</option>
+              <option
+                v-for="sp in scrumbanStore.sprints"
+                :key="sp.id"
+                :value="sp.id"
+              >
+                {{ sp.name.split('—')[0].trim() }}
+              </option>
               <option :value="null">Backlog (Sin Sprint)</option>
             </select>
           </div>
@@ -317,7 +321,7 @@ const handleSubmit = () => {
               class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
             >
               <option
-                v-for="m in authStore.members.filter((x) => x.rbacRole !== 'GUEST_VIEWER')"
+                v-for="m in authStore.activeTeamMembers"
                 :key="m.id"
                 :value="m.id"
               >
@@ -336,9 +340,7 @@ const handleSubmit = () => {
             >
               <option value="">Ninguno</option>
               <option
-                v-for="m in authStore.members.filter(
-                  (x) => x.rbacRole !== 'GUEST_VIEWER' && x.id !== assigneeId
-                )"
+                v-for="m in authStore.activeTeamMembers.filter((x) => x.id !== assigneeId)"
                 :key="m.id"
                 :value="m.id"
               >

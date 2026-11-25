@@ -254,7 +254,7 @@ const handleGuestInstantAccess = () => {
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
-                v-for="member in authStore.members"
+                v-for="member in authStore.activeMembers"
                 :key="member.id"
                 type="button"
                 @click="handleSelectMemberCard(member)"

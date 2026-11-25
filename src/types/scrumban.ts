@@ -12,7 +12,14 @@ export type ColumnId =
   | 'IN_REVIEW'
   | 'DONE'
 
-export type SprintId = 'sprint-1' | 'sprint-2' | 'sprint-3' | null
+export type SprintKey =
+  | 'sprint-1'
+  | 'sprint-2'
+  | 'sprint-3'
+  | 'sprint-4'
+  | 'sprint-5'
+
+export type SprintId = SprintKey | null
 
 export type ArchitecturalLayer = '/cv-service' | '/api-backend' | '/client-app'
 
@@ -42,6 +49,7 @@ export interface TeamMember {
   avatarInitials: string
   avatarColor: string
   permissionsSummary: string
+  inactive?: boolean
 }
 
 export interface ErsRequirement {
@@ -80,7 +88,7 @@ export interface TaskComment {
 }
 
 export interface Task {
-  key: string // PF-10 .. PF-24
+  key: string // PF-10 .. PF-32+
   epicKey: string // PF-5 .. PF-9
   title: string
   description: string
@@ -88,7 +96,7 @@ export interface Task {
   useCases: string[]
   assigneeId: string
   coAssigneeId?: string
-  sprintId: SprintId // Scalar identifier: 'sprint-1' | 'sprint-2' | 'sprint-3' | null
+  sprintId: SprintId // Scalar identifier: 'sprint-1' | 'sprint-2' | 'sprint-3' | 'sprint-4' | 'sprint-5' | null
   columnId: ColumnId
   githubBranch: string
   pullRequestUrl?: string
@@ -104,7 +112,7 @@ export interface Task {
 }
 
 export interface Sprint {
-  id: 'sprint-1' | 'sprint-2' | 'sprint-3'
+  id: SprintKey
   name: string
   goal: string
   startDate: string

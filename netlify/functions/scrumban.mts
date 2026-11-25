@@ -50,24 +50,6 @@ const OFFICIAL_ACCOUNTS: AccountCredential[] = [
     envPasswordOverride: process.env.PARKFLOW_PASS_MIGUEL
   },
   {
-    id: 'member-julio',
-    email: 'l23121112@morelia.tecnm.mx',
-    controlNumber: '23121112',
-    alternateInputs: ['23121112'],
-    rbacRole: 'DEVELOPER',
-    passwordHashHex: '7d797506dcf274a0741122cfa092783aac258c7df011a8558d2979d538aa93a2',
-    envPasswordOverride: process.env.PARKFLOW_PASS_JULIO
-  },
-  {
-    id: 'member-luis',
-    email: 'l24121432@morelia.tecnm.mx',
-    controlNumber: '24120432',
-    alternateInputs: ['l24120432@morelia.tecnm.mx', '24120432'],
-    rbacRole: 'DEVELOPER',
-    passwordHashHex: 'a6ea0afa1c18c320a98ff5c7bc8e0701a8c1cbb92c20afc6c510575cd1379c22',
-    envPasswordOverride: process.env.PARKFLOW_PASS_LUIS
-  },
-  {
     id: 'member-christopher',
     email: 'l23121070@morelia.tecnm.mx',
     controlNumber: '23121070',
@@ -144,6 +126,10 @@ const verifySessionToken = (token?: string | null): TokenPayload | null => {
   try {
     const parsed = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf-8')) as TokenPayload
     if (!parsed.exp || Date.now() > parsed.exp) {
+      return null
+    }
+    const stillActive = OFFICIAL_ACCOUNTS.some((acc) => acc.id === parsed.memberId)
+    if (!stillActive) {
       return null
     }
     return parsed

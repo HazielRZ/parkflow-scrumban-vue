@@ -119,7 +119,7 @@ const openTask = (taskKey: string) => {
             Cruce en tiempo real entre los <strong>22 requisitos oficiales del ERS</strong>
             (`INT-UI`, `INT-HW`, `INT-SW`, `INT-COM`, `RF`, `RNF`, `OT-01`), las
             <strong>5 Épicas (`PF-5` a `PF-9`)</strong> y las
-            <strong>15 Tareas (`PF-10` a `PF-24`)</strong> del proyecto PARK FLOW.
+            <strong>{{ scrumbanStore.tasks.length }} Tareas (`PF-10`+)</strong> del proyecto PARK FLOW.
           </p>
         </div>
 
@@ -219,7 +219,7 @@ const openTask = (taskKey: string) => {
               <th class="py-3.5 px-4">Categoría &amp; Prioridad</th>
               <th class="py-3.5 px-4">Requisito y Criterio Técnico / SLA</th>
               <th class="py-3.5 px-4">Épica(s)</th>
-              <th class="py-3.5 px-4">Tareas Vinculadas (PF-10 a PF-24)</th>
+              <th class="py-3.5 px-4">Tareas Vinculadas (PF-10 a PF-32+)</th>
               <th class="py-3.5 px-4 w-44">Avance Real</th>
             </tr>
           </thead>
@@ -377,7 +377,7 @@ const openTask = (taskKey: string) => {
           </thead>
           <tbody class="divide-y divide-slate-800/70">
             <tr
-              v-for="m in authStore.members"
+              v-for="m in authStore.activeMembers"
               :key="m.id"
               class="hover:bg-slate-800/40"
               :class="authStore.currentUser.id === m.id ? 'bg-emerald-950/20' : ''"

@@ -13,15 +13,13 @@ const PASSWORD_SALT = 'pf-tecnm-2026-salt::'
 const INTEGRITY_PEPPER = 'pf-client-integrity-2026::morelia-tecnm::'
 
 /**
- * Hashes SHA-256 salados de las 6 cuentas oficiales del equipo.
+ * Hashes SHA-256 salados de las 4 cuentas oficiales activas del equipo.
  * CERO contraseñas en texto plano en el bundle de frontend.
  */
 const SALTED_PASSWORD_HASHES: Record<string, string> = {
   'member-haziel': '3b17f2aaab74689f4c7e60e5776506c8c50adb83b651afd1fabda9a8bcc06d64',
   'member-rodrigo': '99c9fc9a6bb23a51a3927d3019bd105f145ae6c23a0621b2700963c8bc05f83d',
   'member-miguel': '4d9f3390375737aa62e90737e37bb9fe6ce02cc1d86b6b469c68a11eda05f3e8',
-  'member-julio': '7d797506dcf274a0741122cfa092783aac258c7df011a8558d2979d538aa93a2',
-  'member-luis': 'a6ea0afa1c18c320a98ff5c7bc8e0701a8c1cbb92c20afc6c510575cd1379c22',
   'member-christopher': 'd598d1fdf3676d6d3c60e93c90ab2b01308e6cec27701fa5da2aecd07f950287'
 }
 
@@ -54,6 +52,14 @@ export const useAuthStore = defineStore('auth', () => {
   const guestProfile =
     TEAM_MEMBERS_SEED.find((m) => m.rbacRole === 'GUEST_VIEWER') || TEAM_MEMBERS_SEED[5]
 
+  const activeMembers = computed<TeamMember[]>(() =>
+    members.value.filter((m) => !m.inactive)
+  )
+
+  const activeTeamMembers = computed<TeamMember[]>(() =>
+    members.value.filter((m) => !m.inactive && m.rbacRole !== 'GUEST_VIEWER')
+  )
+
   const loadValidatedInitialState = (): {
     user: TeamMember
     authenticated: boolean
@@ -70,7 +76,11 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       const found = TEAM_MEMBERS_SEED.find((m) => m.id === savedId)
-      if (!found) {
+      if (!found || found.inactive) {
+        localStorage.removeItem(STORAGE_AUTH_USER_KEY)
+        localStorage.removeItem(STORAGE_AUTH_SESSION_KEY)
+        localStorage.removeItem(STORAGE_AUTH_TOKEN_KEY)
+        localStorage.removeItem(STORAGE_AUTH_CHECKSUM_KEY)
         return { user: guestProfile, authenticated: false, token: '' }
       }
 
@@ -154,6 +164,7 @@ export const useAuthStore = defineStore('auth', () => {
         savedToken
       )
       if (
+        currentUser.value.inactive ||
         savedId !== currentUser.value.id ||
         !savedToken ||
         savedToken !== sessionToken.value ||
@@ -255,7 +266,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // 2. Validación SHA-256 local sin contraseñas en texto plano
     const matched = members.value.find((m) => {
-      if (m.rbacRole === 'GUEST_VIEWER') return false
+      if (m.inactive || m.rbacRole === 'GUEST_VIEWER') return false
       if (m.email.toLowerCase() === normalized) return true
       if (m.controlNumber.toLowerCase() === normalized) return true
       if (m.alternateEmails?.some((alt) => alt.toLowerCase() === normalized)) return true
@@ -362,6 +373,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     members,
+    activeMembers,
+    activeTeamMembers,
     currentUser,
     sessionToken,
     isAuthenticated,

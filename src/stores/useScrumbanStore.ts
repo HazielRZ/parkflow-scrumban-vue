@@ -17,6 +17,7 @@ import type {
   ErsRequirement,
   Sprint,
   SprintId,
+  SprintKey,
   Task,
   ToastNotification
 } from '@/types/scrumban'
@@ -25,7 +26,9 @@ const STORAGE_TASKS_KEY = 'parkflow_scrumban_tasks_v2'
 const STORAGE_SPRINTS_KEY = 'parkflow_scrumban_sprints_v2'
 const STORAGE_ACTIVE_SPRINT_KEY = 'parkflow_scrumban_active_sprint_v2'
 const STORAGE_AUDIT_KEY = 'parkflow_scrumban_audit_v2'
+const STORAGE_MIGRATION_4_5_KEY = 'parkflow_migrated_sprints_4_5_v1'
 const BROADCAST_CHANNEL_NAME = 'parkflow_scrumban_sync'
+const SPRINT_ORDER: SprintKey[] = ['sprint-1', 'sprint-2', 'sprint-3', 'sprint-4', 'sprint-5']
 
 export interface TaskUpsertPayload {
   title: string
@@ -51,37 +54,154 @@ export const useScrumbanStore = defineStore('scrumban', () => {
   const cloneSeedTasks = (): Task[] => JSON.parse(JSON.stringify(TASKS_SEED))
   const cloneSeedSprints = (): Sprint[] => JSON.parse(JSON.stringify(SPRINTS_SEED))
 
-  const loadTasks = (): Task[] => {
+  const migrateBoardState = (
+    rawTasks: Task[],
+    rawSprints: Sprint[]
+  ): { tasks: Task[]; sprints: Sprint[]; changed: boolean } => {
+    let changed = false
+
+    // 1. Sprints: asegurar que sprint-1..sprint-5 estén presentes en orden
+    const sprintMap = new Map<SprintKey, Sprint>()
+    rawSprints.forEach((s) => {
+      if (SPRINT_ORDER.includes(s.id)) {
+        sprintMap.set(s.id, { ...s })
+      }
+    })
+
+    let hadMissingSprints = false
+    SPRINTS_SEED.forEach((seedSp) => {
+      if (!sprintMap.has(seedSp.id)) {
+        sprintMap.set(seedSp.id, JSON.parse(JSON.stringify(seedSp)))
+        hadMissingSprints = true
+        changed = true
+      }
+    })
+
+    const nextSprints = SPRINT_ORDER.map((id) => sprintMap.get(id)!).filter(Boolean)
+
+    // 2. Tareas de Sprints 4 y 5 (PF-25..PF-32)
+    const nextTasks: Task[] = rawTasks.map((t) => ({
+      ...t,
+      ersCodes: [...(t.ersCodes || [])],
+      useCases: [...(t.useCases || [])],
+      acceptanceCriteria: [...(t.acceptanceCriteria || [])],
+      subtasks: (t.subtasks || []).map((s) => ({ ...s })),
+      comments: (t.comments || []).map((c) => ({ ...c }))
+    }))
+
+    let migrationAlreadyApplied = false
     try {
-      const raw = localStorage.getItem(STORAGE_TASKS_KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw) as Task[]
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      migrationAlreadyApplied = localStorage.getItem(STORAGE_MIGRATION_4_5_KEY) === 'true'
+    } catch {
+      migrationAlreadyApplied = false
+    }
+
+    const hasSprint4Or5Tasks = nextTasks.some(
+      (t) => t.sprintId === 'sprint-4' || t.sprintId === 'sprint-5'
+    )
+
+    if (hadMissingSprints || (!hasSprint4Or5Tasks && !migrationAlreadyApplied)) {
+      const seedSprint45Tasks = TASKS_SEED.filter(
+        (t) => t.sprintId === 'sprint-4' || t.sprintId === 'sprint-5'
+      )
+
+      const existingKeys = new Set(nextTasks.map((t) => t.key.toUpperCase()))
+      const getFreeKey = (): string => {
+        const nums = Array.from(existingKeys)
+          .map((k) => {
+            const m = k.match(/^PF-(\d+)$/i)
+            return m ? parseInt(m[1], 10) : 0
+          })
+          .filter((n) => !Number.isNaN(n))
+        const maxNum = nums.length > 0 ? Math.max(...nums) : 24
+        const candidate = `PF-${maxNum + 1}`
+        existingKeys.add(candidate)
+        return candidate
+      }
+
+      seedSprint45Tasks.forEach((seedTask) => {
+        const cloned: Task = JSON.parse(JSON.stringify(seedTask))
+        if (existingKeys.has(cloned.key.toUpperCase())) {
+          const oldKey = cloned.key
+          const freeKey = getFreeKey()
+          cloned.key = freeKey
+          cloned.githubBranch = cloned.githubBranch.replace(
+            new RegExp(`^feature/${oldKey}-`, 'i'),
+            `feature/${freeKey}-`
+          )
+          cloned.subtasks = cloned.subtasks.map((s, idx) => ({
+            ...s,
+            id: `${freeKey}-sub-${idx + 1}`
+          }))
+        } else {
+          existingKeys.add(cloned.key.toUpperCase())
+        }
+        nextTasks.push(cloned)
+        changed = true
+      })
+
+      try {
+        localStorage.setItem(STORAGE_MIGRATION_4_5_KEY, 'true')
+      } catch {
+        // ignore
+      }
+    }
+
+    // 3. Reasignación de bajas (member-julio, member-luis) en tareas NO terminadas (columnId !== 'DONE')
+    nextTasks.forEach((t) => {
+      if (t.columnId === 'DONE') return
+
+      if (t.assigneeId === 'member-luis') {
+        t.assigneeId = 'member-christopher'
+        changed = true
+      } else if (t.assigneeId === 'member-julio') {
+        t.assigneeId = t.layer === '/cv-service' ? 'member-rodrigo' : 'member-christopher'
+        changed = true
+      }
+
+      if (t.coAssigneeId === 'member-luis' || t.coAssigneeId === 'member-julio') {
+        const replacement =
+          t.assigneeId !== 'member-christopher' ? 'member-christopher' : 'member-miguel'
+        t.coAssigneeId = replacement === t.assigneeId ? undefined : replacement
+        changed = true
+      }
+    })
+
+    return { tasks: nextTasks, sprints: nextSprints, changed }
+  }
+
+  const loadInitialBoardState = (): { tasks: Task[]; sprints: Sprint[]; changed: boolean } => {
+    let rawTasks: Task[] = cloneSeedTasks()
+    let rawSprints: Sprint[] = cloneSeedSprints()
+
+    try {
+      const savedTasks = localStorage.getItem(STORAGE_TASKS_KEY)
+      if (savedTasks) {
+        const parsed = JSON.parse(savedTasks) as Task[]
+        if (Array.isArray(parsed) && parsed.length > 0) rawTasks = parsed
       }
     } catch {
       // fallback to seed
     }
-    return cloneSeedTasks()
-  }
 
-  const loadSprints = (): Sprint[] => {
     try {
-      const raw = localStorage.getItem(STORAGE_SPRINTS_KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw) as Sprint[]
-        if (Array.isArray(parsed) && parsed.length === 3) return parsed
+      const savedSprints = localStorage.getItem(STORAGE_SPRINTS_KEY)
+      if (savedSprints) {
+        const parsed = JSON.parse(savedSprints) as Sprint[]
+        if (Array.isArray(parsed) && parsed.length > 0) rawSprints = parsed
       }
     } catch {
       // fallback to seed
     }
-    return cloneSeedSprints()
+
+    return migrateBoardState(rawTasks, rawSprints)
   }
 
-  const loadSelectedSprint = (): 'sprint-1' | 'sprint-2' | 'sprint-3' | 'ALL' => {
+  const loadSelectedSprint = (): SprintKey | 'ALL' => {
     try {
       const saved = localStorage.getItem(STORAGE_ACTIVE_SPRINT_KEY)
-      if (saved === 'sprint-1' || saved === 'sprint-2' || saved === 'sprint-3' || saved === 'ALL') {
-        return saved
+      if (saved === 'ALL' || (saved && SPRINT_ORDER.includes(saved as SprintKey))) {
+        return saved as SprintKey | 'ALL'
       }
     } catch {
       // ignore
@@ -133,8 +253,9 @@ export const useScrumbanStore = defineStore('scrumban', () => {
     ]
   }
 
-  const tasks = ref<Task[]>(loadTasks())
-  const sprints = ref<Sprint[]>(loadSprints())
+  const initialBoard = loadInitialBoardState()
+  const tasks = ref<Task[]>(initialBoard.tasks)
+  const sprints = ref<Sprint[]>(initialBoard.sprints)
   const epics = ref<Epic[]>(EPICS_SEED)
   const ersRequirements = ref<ErsRequirement[]>(ERS_REQUIREMENTS_SEED)
   const columns = ref<ColumnDefinition[]>(COLUMNS_CONFIG)
@@ -145,7 +266,7 @@ export const useScrumbanStore = defineStore('scrumban', () => {
   const lastCloudSyncAt = ref<string | null>(null)
 
   // Filters & active selections
-  const selectedSprintFilter = ref<'sprint-1' | 'sprint-2' | 'sprint-3' | 'ALL'>(loadSelectedSprint())
+  const selectedSprintFilter = ref<SprintKey | 'ALL'>(loadSelectedSprint())
   const selectedEpicFilter = ref<string>('ALL')
   const selectedLayerFilter = ref<ArchitecturalLayer | 'ALL'>('ALL')
   const selectedAssigneeFilter = ref<string>('ALL')
@@ -214,16 +335,21 @@ export const useScrumbanStore = defineStore('scrumban', () => {
       }
       const data = await res.json()
       if (data.ok && data.state && Array.isArray(data.state.tasks)) {
-        tasks.value = data.state.tasks
-        if (Array.isArray(data.state.sprints)) {
-          sprints.value = data.state.sprints
-        }
+        const rawCloudSprints = Array.isArray(data.state.sprints)
+          ? (data.state.sprints as Sprint[])
+          : cloneSeedSprints()
+        const migrated = migrateBoardState(data.state.tasks as Task[], rawCloudSprints)
+        tasks.value = migrated.tasks
+        sprints.value = migrated.sprints
         if (Array.isArray(data.state.auditLog)) {
           auditLog.value = data.state.auditLog
         }
         lastCloudSyncAt.value = data.state.updatedAt || new Date().toISOString()
         persistLocal(true)
         cloudSyncStatus.value = 'synced'
+        if (migrated.changed && !authStore.isReadOnly) {
+          await saveToCloud(false)
+        }
         if (!silent) {
           pushToast(
             'info',
@@ -304,6 +430,9 @@ export const useScrumbanStore = defineStore('scrumban', () => {
 
   // Inicializar sincronización con Netlify Cloud al cargar el store
   if (typeof window !== 'undefined') {
+    if (initialBoard.changed) {
+      persistLocal(true)
+    }
     syncFromCloud(true)
     window.addEventListener('focus', () => {
       syncFromCloud(true)
@@ -780,7 +909,7 @@ export const useScrumbanStore = defineStore('scrumban', () => {
   }
 
   /**
-   * Asignar o cambiar el Sprint escalar único de una tarea ('sprint-1' | 'sprint-2' | 'sprint-3' | null)
+   * Asignar o cambiar el Sprint escalar único de una tarea ('sprint-1' .. 'sprint-5' | null)
    */
   const assignTaskToSprint = (taskKey: string, sprintId: SprintId): boolean => {
     if (authStore.isReadOnly) {
@@ -830,7 +959,7 @@ export const useScrumbanStore = defineStore('scrumban', () => {
    * Únicamente Haziel Ruiz Zúñiga (l221213339@morelia.tecnm.mx - ADMIN_PO_SM) puede
    * ejecutar startSprint(), completeSprint() o updateSprint().
    */
-  const startSprint = (sprintId: 'sprint-1' | 'sprint-2' | 'sprint-3'): boolean => {
+  const startSprint = (sprintId: SprintKey): boolean => {
     if (authStore.currentUser.rbacRole !== 'ADMIN_PO_SM') {
       pushToast(
         'error',
@@ -863,7 +992,7 @@ export const useScrumbanStore = defineStore('scrumban', () => {
     return true
   }
 
-  const completeSprint = (sprintId: 'sprint-1' | 'sprint-2' | 'sprint-3'): boolean => {
+  const completeSprint = (sprintId: SprintKey): boolean => {
     if (authStore.currentUser.rbacRole !== 'ADMIN_PO_SM') {
       pushToast(
         'error',
@@ -876,12 +1005,9 @@ export const useScrumbanStore = defineStore('scrumban', () => {
     const currentSprint = sprints.value.find((s) => s.id === sprintId)
     if (!currentSprint) return false
 
+    const idx = SPRINT_ORDER.indexOf(sprintId)
     const nextSprintId: SprintId =
-      sprintId === 'sprint-1'
-        ? 'sprint-2'
-        : sprintId === 'sprint-2'
-          ? 'sprint-3'
-          : null
+      idx >= 0 && idx < SPRINT_ORDER.length - 1 ? SPRINT_ORDER[idx + 1] : null
 
     const sprintTasks = tasks.value.filter((t) => t.sprintId === sprintId)
     const completedTasks = sprintTasks.filter((t) => t.columnId === 'DONE')
@@ -930,7 +1056,7 @@ export const useScrumbanStore = defineStore('scrumban', () => {
   }
 
   const updateSprint = (
-    sprintId: 'sprint-1' | 'sprint-2' | 'sprint-3',
+    sprintId: SprintKey,
     payload: Partial<Pick<Sprint, 'name' | 'goal' | 'startDate' | 'endDate'>>
   ): boolean => {
     if (authStore.currentUser.rbacRole !== 'ADMIN_PO_SM') {
@@ -1046,13 +1172,13 @@ export const useScrumbanStore = defineStore('scrumban', () => {
     searchQuery.value = ''
     recordAudit(
       'SEED_RESTORED',
-      'Haziel (ADMIN_PO_SM) restauró los datos semilla oficiales de PARK FLOW (PF-5 a PF-24 y ERSIS2026 III).'
+      'Haziel (ADMIN_PO_SM) restauró los datos semilla oficiales de PARK FLOW (PF-5 a PF-32, Sprints 1 a 5 y ERSIS2026 III).'
     )
     saveToCloud(true)
     pushToast(
       'info',
       'Datos Semilla Restaurados',
-      'El tablero volvió al estado inicial oficial de PARK FLOW (PF-5 a PF-24).'
+      'El tablero volvió al estado inicial oficial de PARK FLOW (PF-5 a PF-32, Sprints 1 a 5).'
     )
   }
 

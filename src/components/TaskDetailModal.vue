@@ -18,7 +18,7 @@ import {
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useScrumbanStore } from '@/stores/useScrumbanStore'
-import type { ColumnId, SprintId } from '@/types/scrumban'
+import type { ColumnId, SprintId, SprintKey } from '@/types/scrumban'
 
 const authStore = useAuthStore()
 const scrumbanStore = useScrumbanStore()
@@ -65,11 +65,20 @@ const handleColumnChange = (colId: ColumnId) => {
   scrumbanStore.moveTask(task.value.key, colId)
 }
 
+const validSprintKeys: SprintKey[] = [
+  'sprint-1',
+  'sprint-2',
+  'sprint-3',
+  'sprint-4',
+  'sprint-5'
+]
+
 const handleSprintChange = (event: Event) => {
   if (!task.value) return
   const val = (event.target as HTMLSelectElement).value
-  const parsed: SprintId =
-    val === 'sprint-1' || val === 'sprint-2' || val === 'sprint-3' ? val : null
+  const parsed: SprintId = validSprintKeys.includes(val as SprintKey)
+    ? (val as SprintKey)
+    : null
   scrumbanStore.assignTaskToSprint(task.value.key, parsed)
 }
 
@@ -229,9 +238,19 @@ const handleDeleteTask = () => {
                 @change="handleSprintChange"
                 class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
               >
-                <option value="sprint-1">Sprint 1 (Semanas 1 - 2)</option>
-                <option value="sprint-2">Sprint 2 (Semanas 3 - 4)</option>
-                <option value="sprint-3">Sprint 3 (Semanas 5 - 6)</option>
+                <option
+                  v-for="sp in scrumbanStore.sprints"
+                  :key="sp.id"
+                  :value="sp.id"
+                >
+                  {{ sp.name.split('—')[0].trim() }} ({{
+                    sp.status === 'ACTIVE'
+                      ? 'Activo'
+                      : sp.status === 'COMPLETED'
+                        ? 'Completado'
+                        : 'Planeado'
+                  }})
+                </option>
                 <option value="">Sin Sprint (Product Backlog)</option>
               </select>
             </div>

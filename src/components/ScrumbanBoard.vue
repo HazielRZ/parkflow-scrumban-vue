@@ -75,14 +75,14 @@ const clearFilters = () => {
               {{
                 scrumbanStore.currentViewedSprint
                   ? `${scrumbanStore.currentViewedSprint.id.toUpperCase()} • ${scrumbanStore.currentViewedSprint.status}`
-                  : 'VISTA GLOBAL (3 SPRINTS)'
+                  : `VISTA GLOBAL (${scrumbanStore.sprints.length} SPRINTS)`
               }}
             </span>
             <h2 class="text-sm sm:text-base font-bold text-white">
               {{
                 scrumbanStore.currentViewedSprint
                   ? scrumbanStore.currentViewedSprint.name
-                  : 'Backlog Completo y Sprints del Proyecto PARK FLOW (PF-10 a PF-24)'
+                  : `Backlog Completo y Sprints del Proyecto PARK FLOW (${scrumbanStore.tasks.length} Historias)`
               }}
             </h2>
           </div>
@@ -90,7 +90,7 @@ const clearFilters = () => {
             {{
               scrumbanStore.currentViewedSprint
                 ? scrumbanStore.currentViewedSprint.goal
-                : 'Visualizando las 15 historias técnicas trazadas a las 5 Épicas (PF-5 a PF-9) y los 22 requisitos del ERSIS2026 III.'
+                : `Visualizando las ${scrumbanStore.tasks.length} historias técnicas trazadas a las 5 Épicas (PF-5 a PF-9) y los 22 requisitos del ERSIS2026 III.`
             }}
           </p>
         </div>
@@ -172,9 +172,11 @@ const clearFilters = () => {
           v-model="scrumbanStore.selectedAssigneeFilter"
           class="rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 focus:border-emerald-500 focus:outline-none"
         >
-          <option value="ALL">Todos los Integrantes (6)</option>
+          <option value="ALL">
+            Todos los Integrantes Activos ({{ authStore.activeTeamMembers.length }})
+          </option>
           <option
-            v-for="m in authStore.members.filter((x) => x.rbacRole !== 'GUEST_VIEWER')"
+            v-for="m in authStore.activeTeamMembers"
             :key="m.id"
             :value="m.id"
           >
