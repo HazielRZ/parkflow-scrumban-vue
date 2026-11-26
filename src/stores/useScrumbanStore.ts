@@ -147,19 +147,16 @@ export const useScrumbanStore = defineStore('scrumban', () => {
       }
     }
 
-    // 3. Reasignación de bajas (member-julio, member-luis) en tareas NO terminadas (columnId !== 'DONE')
+    // 3. Reasignación de baja (member-julio) en tareas NO terminadas (columnId !== 'DONE')
     nextTasks.forEach((t) => {
       if (t.columnId === 'DONE') return
 
-      if (t.assigneeId === 'member-luis') {
-        t.assigneeId = 'member-christopher'
-        changed = true
-      } else if (t.assigneeId === 'member-julio') {
+      if (t.assigneeId === 'member-julio') {
         t.assigneeId = t.layer === '/cv-service' ? 'member-rodrigo' : 'member-christopher'
         changed = true
       }
 
-      if (t.coAssigneeId === 'member-luis' || t.coAssigneeId === 'member-julio') {
+      if (t.coAssigneeId === 'member-julio') {
         const replacement =
           t.assigneeId !== 'member-christopher' ? 'member-christopher' : 'member-miguel'
         t.coAssigneeId = replacement === t.assigneeId ? undefined : replacement

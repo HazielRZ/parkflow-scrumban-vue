@@ -50,6 +50,15 @@ const OFFICIAL_ACCOUNTS: AccountCredential[] = [
     envPasswordOverride: process.env.PARKFLOW_PASS_MIGUEL
   },
   {
+    id: 'member-luis',
+    email: 'l24121432@morelia.tecnm.mx',
+    controlNumber: '24120432',
+    alternateInputs: ['l24120432@morelia.tecnm.mx', '24120432'],
+    rbacRole: 'DEVELOPER',
+    passwordHashHex: 'a6ea0afa1c18c320a98ff5c7bc8e0701a8c1cbb92c20afc6c510575cd1379c22',
+    envPasswordOverride: process.env.PARKFLOW_PASS_LUIS
+  },
+  {
     id: 'member-christopher',
     email: 'l23121070@morelia.tecnm.mx',
     controlNumber: '23121070',

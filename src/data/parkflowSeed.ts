@@ -100,12 +100,12 @@ export const TEAM_MEMBERS_SEED: TeamMember[] = [
     controlNumber: '24120432',
     email: 'l24121432@morelia.tecnm.mx',
     alternateEmails: ['l24120432@morelia.tecnm.mx', '24120432'],
-    projectRole: 'Full-Stack & Frontend Developer (Baja del proyecto)',
+    projectRole: 'Full-Stack & Frontend Developer',
     rbacRole: 'DEVELOPER',
     avatarInitials: 'LA',
     avatarColor: 'bg-amber-600 text-white ring-amber-400',
-    permissionsSummary: 'Acceso revocado por baja del proyecto.',
-    inactive: true
+    permissionsSummary:
+      'Actualizar progreso de sus tareas (Por hacer -> En progreso -> En revisión), registrar subtareas, comentarios y ramas feature/PF-XX. No puede cerrar Sprints ni auto-aprobar Code Review.'
   },
   {
     id: 'member-christopher',
